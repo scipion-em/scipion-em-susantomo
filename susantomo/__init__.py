@@ -110,7 +110,7 @@ class Plugin(pwem.Plugin):
                 f'cd {ENV_NAME} && cd dependencies && ',
                 f'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
                 f'cd ../+SUSAN && mkdir bin && cd bin && cmake3 .. && ',
-                f'cd +SUSAN/bin && make -j {env.getProcessors()}']
+                f'make -j {env.getProcessors()}']
 
             susanCmds = [(" ".join(installCmds), '+SUSAN/bin/susan_aligner_mpi')]
 
