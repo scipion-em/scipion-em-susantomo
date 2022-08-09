@@ -1,0 +1,78 @@
+============
+SUSAN plugin
+============
+
+This plugin provides wrappers for `Susan <https://github.com/KudryashevLab/SUSAN>`_ software: subtomogram averaging (StA) workflow for CryoET based on sub-stacks of images instead of sub-volumes of tomograms
+
+.. image:: https://img.shields.io/pypi/v/scipion-em-susantomo.svg
+        :target: https://pypi.python.org/pypi/scipion-em-susantomo
+        :alt: PyPI release
+
+.. image:: https://img.shields.io/pypi/l/scipion-em-susantomo.svg
+        :target: https://pypi.python.org/pypi/scipion-em-susantomo
+        :alt: License
+
+.. image:: https://img.shields.io/pypi/pyversions/scipion-em-susantomo.svg
+        :target: https://pypi.python.org/pypi/scipion-em-susantomo
+        :alt: Supported Python versions
+
+.. image:: https://img.shields.io/sonar/quality_gate/scipion-em_scipion-em-susantomo?server=https%3A%2F%2Fsonarcloud.io
+        :target: https://sonarcloud.io/dashboard?id=scipion-em_scipion-em-susantomo
+        :alt: SonarCloud quality gate
+
+.. image:: https://img.shields.io/pypi/dm/scipion-em-susantomo
+        :target: https://pypi.python.org/pypi/scipion-em-susantomo
+        :alt: Downloads
+
+Installation
+-------------
+
+You will need to use 3.0+ version of Scipion to be able to run these protocols. To install the plugin, you have two options:
+
+a) Stable version
+
+.. code-block::
+
+   scipion installp -p scipion-em-susantomo
+
+b) Developer's version
+
+   * download repository
+
+    .. code-block::
+
+        git clone https://github.com/scipion-em/scipion-em-susantomo.git
+
+   * install
+
+    .. code-block::
+
+       scipion installp -p /path/to/scipion-em-susantomo --devel
+
+- SUSAN sources will be downloaded and compiled automatically with the plugin, but you can also link an existing installation. Default installation path assumed is ``software/em/susan-1.0``, if you want to change it, set *SUSAN_HOME* in ``scipion.conf`` file to the folder where the SUSAN is installed.
+- If you need to use CUDA different from the one used during Scipion installation (defined by *CUDA_LIB*), you can add *SUSAN_CUDA_LIB* variable to the config file.
+- If you have to use a MPI for SUSAN different from Scipion MPI, you can set *SUSAN_MPI_BIN* and *SUSAN_MPI_LIB* variables in the config file.
+
+
+Verifying
+---------
+
+To check the installation, simply run one of the tests. A complete list of tests can be displayed by executing ``scipion test --show --grep susantomo``
+
+Supported versions
+------------------
+
+1.0
+
+Protocols
+----------
+
+* ctf estimation
+* align 2D
+* align 3D
+* average and reconstruct 3D
+
+References
+-----------
+
+1. Sánchez RM, Mester R, Kudryashev M, Fast Cross Correlation for Limited Angle Tomographic Data. In: Felsberg M., Forssén PE., Sintorn IM., Unger J. (eds) Image Analysis. SCIA 2019. Lecture Notes in Computer Science, vol 11482. Doi: 10.23919/EUSIPCO.2019.8903041
