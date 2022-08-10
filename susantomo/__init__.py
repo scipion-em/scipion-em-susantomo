@@ -134,8 +134,8 @@ class Plugin(pwem.Plugin):
         return envVar.split()[-1].split("-")[-1]
 
     @classmethod
-    def getProgram(cls, script, paramsFn):
+    def getProgram(cls, script):
         scriptFn = os.path.join(__path__[0], f'scripts/{script}')
-        cmd = f"{Plugin.getActivationCmd()} python3 {scriptFn} {paramsFn}"
+        cmd = f"{Plugin.getActivationCmd()} python3 {scriptFn} "
 
         return cmd

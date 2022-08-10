@@ -25,51 +25,40 @@
 # **************************************************************************
 
 import os
-
-from pyworkflow.utils import magentaStr
 from pyworkflow.tests import BaseTest, DataSet, setupTestProject
-from tomo.protocols import ProtImportTs
+from pyworkflow.utils import magentaStr
 
+from tomo.protocols import ProtImportTs
 from ..protocols import ProtSusanEstimateCtf
 
 
-class TestSusanBase(BaseTest):
+class TestBase(BaseTest):
     @classmethod
-    def setUpClass(cls):
-        setupTestProject(cls)
-        cls.inputDataSet = DataSet.getDataSet('tomo-em')
-        cls.inputSoTS = cls.inputDataSet.getFile('ts1')
-
-    @classmethod
-    def _runImportTiltSeries(cls):
-        cls.protImportTS = cls.newProtocol(ProtImportTs,
-                                           filesPath=os.path.split(cls.inputSoTS)[0],
-                                           filesPattern="BB{TS}.st",
-                                           anglesFrom=0,
-                                           voltage=300,
-                                           magnification=105000,
-                                           sphericalAberration=2.7,
-                                           amplitudeContrast=0.1,
-                                           samplingRate=20.2,
-                                           doseInitial=0,
-                                           dosePerFrame=0.3,
-                                           minAngle=-55,
-                                           maxAngle=65.0,
-                                           stepAngle=2.0,
-                                           tiltAxisAngle=-12.5)
+    def runImportTiltSeries(cls, **kwargs):
+        cls.protImportTS = cls.newProtocol(ProtImportTs, **kwargs)
         cls.launchProtocol(cls.protImportTS)
         return cls.protImportTS
 
 
-class TestSusan(TestSusanBase):
-    def test_estimateCtf(self):
-        print(magentaStr("\n==> Importing data - TiltSeries:"))
-        protImport = self._runImportTiltSeries()
+class TestSusanCtf(TestBase):
+    @classmethod
+    def setUpClass(cls):
+        setupTestProject(cls)
+        cls.inputDataSet = DataSet.getDataSet('tutorialDataImodCTF')
+        cls.inputSoTS = cls.inputDataSet.getFile('tsCtf1')
 
-        print(magentaStr("\n==> Testing SUSAN: ctf estimation"))
-        prot = self.newProtocol(ProtSusanEstimateCtf,
-                                inputSetOfTiltSeries=protImport.outputTiltSeries,
-                                )
-        self.launchProtocol(prot)
-        self.assertIsNotNone(prot.outputCTFs,
-                             "SetOfCTFTomoSeries has not been produced.")
+        print(magentaStr("\n==> Importing data - tilt series:"))
+        cls.protImportTS = cls.runImportTiltSeries(filesPath=os.path.dirname(cls.inputSoTS),
+                                                   filesPattern="WTI042413_1series4.mdoc",
+                                                   voltage=300,
+                                                   sphericalAberration=2.7,
+                                                   amplitudeContrast=0.07,
+                                                   anglesFrom=2)
+
+    def testCtfEstimation(self):
+        print(magentaStr("\n==> Testing susan - ctf estimation:"))
+        protCTF = ProtSusanEstimateCtf()
+        protCTF.inputTiltSeries.set(self.protImportTS.outputTiltSeries)
+        self.launchProtocol(protCTF)
+
+        self.assertIsNotNone(protCTF.outputSetOfCTFTomoSeries, "SetOfCTFTomoSeries has not been produced.")

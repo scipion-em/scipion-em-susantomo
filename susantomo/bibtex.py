@@ -27,7 +27,7 @@
 """
 @article{Sanchez2019,
   author={Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  booktitle={2019 27th European Signal Processing Conference (EUSIPCO)},
+  booktitle={27th European Signal Processing Conference (EUSIPCO)},
   title={Fast Alignment of Limited Angle Tomograms by projected Cross Correlation},
   year={2019},
   volume={},

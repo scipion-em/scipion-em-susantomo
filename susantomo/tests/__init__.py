@@ -25,10 +25,14 @@
 # **************************************************************************
 
 from pyworkflow.tests import DataSet
+from pyworkflow.utils import weakImport
 
-DataSet(name='tomo-em',
-        folder='tomo-em',
+
+with weakImport("tomo"):
+    from .test_protocols_susan import TestSusanCtf
+
+DataSet(name='tutorialDataImodCTF',
+        folder='tutorialDataImodCTF',
         files={
-            'ts1': 'tutorialData/BBa.st',
-            'ts2': 'tutorialData/BBb.st'
+            'tsCtf1': 'WTI042413_1series4.st'
         })
