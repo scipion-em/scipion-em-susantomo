@@ -132,3 +132,10 @@ class Plugin(pwem.Plugin):
         """ Return the env name that is currently active. """
         envVar = cls.getVar(SUSAN_ENV_ACTIVATION)
         return envVar.split()[-1].split("-")[-1]
+
+    @classmethod
+    def getProgram(cls, script, paramsFn):
+        scriptFn = os.path.join(__path__[0], f'scripts/{script}')
+        cmd = f"{Plugin.getActivationCmd()} python3 {scriptFn} {paramsFn}"
+
+        return cmd
