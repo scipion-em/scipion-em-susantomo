@@ -44,7 +44,7 @@ def createTomoFile(params, ts_id, output_dir):
     tomos.set_stack(0, params['inputStack'])
     tomos.set_angles(0, params['inputAngles'])
     tomos.pix_size[0] = params['pix_size']
-    tomos.tomo_size[0] = params['tomo_size']
+    tomos.tomo_size[0] = tuple(params['tomo_size'])
 
     tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
 
@@ -60,7 +60,7 @@ def estimateCtf(params, ts_id, output_dir):
     """ Run CTF estimator. """
     ctf_est = SUSAN.modules.CtfEstimator()
     ctf_est.binning = params['binning']
-    ctf_est.list_gpus_ids = params['gpus']  # ID's of GPUs to use
+    ctf_est.list_gpus_ids = list(params['gpus'])  # ID's of GPUs to use
     ctf_est.resolution_angs.min_val = params['min_res']  # angstroms
     ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
     ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms

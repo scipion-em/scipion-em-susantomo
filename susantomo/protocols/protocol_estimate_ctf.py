@@ -31,6 +31,7 @@ from enum import Enum
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import NEW
 import pyworkflow.utils as pwutils
+
 from tomo.objects import CTFTomo, SetOfCTFTomoSeries
 from tomo.protocols.protocol_ts_estimate_ctf import ProtTsEstimateCTF
 
@@ -47,10 +48,15 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
     _devStatus = NEW
     _possibleOutputs = outputs
 
-    # --------------------------- DEFINE param functions ----------------------
+    # -------------------------- DEFINE param functions -----------------------
     def _defineProcessParams(self, form):
         form.addHidden(params.GPU_LIST, params.StringParam,
                        default='0', label="Choose GPU IDs")
+
+        form.addParam('tomoSize', params.IntParam,
+                      default=800, label='Tomogram thickness (voxels)',
+                      help='Z height of the reconstructed volume in '
+                           '*unbinned* voxels.')
 
         form.addParam('sampling', params.IntParam, default=180,
                       label="CTF grid spacing (px)",
@@ -84,10 +90,10 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         form.addParallelSection(threads=1, mpi=1)
 
     # --------------------------- STEPS functions -----------------------------
-    def convertInputStep(self, tsObjId):
+    def processTiltSeriesStep(self, tsObjId):
+        """Run susan_estimate_ctf program"""
         ts = self._getTiltSeries(tsObjId)
         tsId = ts.getTsId()
-
         extraPrefix = self._getExtraPath(tsId)
         tmpPrefix = self._getTmpPath(tsId)
         pwutils.makePath(tmpPrefix)
@@ -96,26 +102,20 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         ts.applyTransform(self.getFilePath(tsObjId, tmpPrefix, ".mrc"))
         ts.generateTltFile(self.getFilePath(tsObjId, tmpPrefix, ".tlt"))
 
-    def processTiltSeriesStep(self, tsObjId):
-        """Run susan_estimate_ctf program"""
-        ts = self._getTiltSeries(tsObjId)
-        tsId = ts.getTsId()
-        extraPrefix = self._getExtraPath(tsId)
-        tmpPrefix = self._getTmpPath(tsId)
-
         paramDict = self.getCtfParamsDict()
+        tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
 
         params = {
-            'ts_num': 1,
+            'ts_num': ts.getObjId(),
             'inputStack': self.getFilePath(tsObjId, tmpPrefix, ".mrc"),
             'inputAngles': self.getFilePath(tsObjId, tmpPrefix, ".tlt"),
             'output_dir': extraPrefix,
-            'num_tilts': ts.getAnglesCount(),
+            'num_tilts': ts.getDim()[-1],
             'pix_size': ts.getSamplingRate(),
-            'tomo_size': ts.getDim(),
+            'tomo_size': tomo_size,
             'sampling': self.sampling.get(),
             'binning': self.ctfDownFactor.get(),
-            'gpus': '%(GPU)s'.split(","),
+            'gpus': self.getGpuList(),
             'min_res': paramDict['lowRes'],
             'max_res': paramDict['highRes'],
             'def_min': paramDict['minDefocus'],
@@ -123,11 +123,11 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'patch_size': self.windowSize.get()
         }
 
-        jsonFn = self.getFilePath(tsObjId, extraPrefix, ".json")
+        jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
         with open(jsonFn, "w") as fn:
-            json.dump(params, fn)
+            json.dump(params, fn, indent=4)
 
-        self.runJob(Plugin.getProgram("protocol_estimate_ctf.py"), jsonFn,
+        self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
                     env=Plugin.getEnviron())
 
         for i, ti in enumerate(self._tsDict.getTiList(tsId)):
@@ -157,7 +157,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
 
     def getCtf(self, ti):
         """ Parse the CTF object estimated for this Tilt-Image. """
-        return
+        return None
         psd = self.getPsdName(ti)
         outCtf = self._getTmpPath(psd.replace('.mrc', '.txt'))
         ctfModel = self._ctfProgram.parseOutputAsCtf(outCtf,

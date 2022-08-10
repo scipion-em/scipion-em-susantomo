@@ -79,9 +79,8 @@ class Plugin(pwem.Plugin):
             environ.set('PATH', os.environ['SUSAN_MPI_BIN'],
                         position=pwutils.Environ.BEGIN)
 
-        if 'PYTHONPATH' in environ:
-            # this is required for python virtual env to work
-            del environ['PYTHONPATH']
+        # This is required for SUSAN Python API to work
+        environ.update({'PYTHONPATH': cls.getHome()})
 
         return environ
 
@@ -136,6 +135,6 @@ class Plugin(pwem.Plugin):
     @classmethod
     def getProgram(cls, script):
         scriptFn = os.path.join(__path__[0], f'scripts/{script}')
-        cmd = f"{Plugin.getActivationCmd()} python3 {scriptFn} "
+        cmd = f"{Plugin.getActivationCmd()} && python3 {scriptFn} "
 
         return cmd
