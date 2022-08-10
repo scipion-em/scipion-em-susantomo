@@ -45,6 +45,9 @@ def createTomoFile(params, ts_id, output_dir):
     tomos.set_angles(0, params['inputAngles'])
     tomos.pix_size[0] = params['pix_size']
     tomos.tomo_size[0] = tuple(params['tomo_size'])
+    tomos.voltage[0] = params['voltage']
+    tomos.amp_cont[0] = params['amp_cont']
+    tomos.sph_aber[0] = params['sph_aber']
 
     tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
 
@@ -70,9 +73,9 @@ def estimateCtf(params, ts_id, output_dir):
                      os.path.join(output_dir, "grid_ctf.ptclsraw"),
                      params['patch_size'])
 
-    tomos = SUSAN.read(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
-    tomos.set_defocus(0, os.path.join(output_dir, f'ctf_grid/Tomo{ts_id:03g}/defocus.txt'))
-    tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
+    #tomos = SUSAN.read(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
+    #tomos.set_defocus(0, os.path.join(output_dir, f'ctf_grid/Tomo{ts_id:03g}/defocus.txt'))
+    #tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
 
 
 if __name__ == '__main__':

@@ -36,6 +36,7 @@ from tomo.objects import CTFTomo, SetOfCTFTomoSeries
 from tomo.protocols.protocol_ts_estimate_ctf import ProtTsEstimateCTF
 
 from .. import Plugin
+from ..convert import parseCtf
 
 
 class outputs(Enum):
@@ -58,7 +59,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
                       help='Z height of the reconstructed volume in '
                            '*unbinned* voxels.')
 
-        form.addParam('sampling', params.IntParam, default=180,
+        form.addParam('gridSampling', params.IntParam, default=180,
                       label="CTF grid spacing (px)",
                       help="Spacing between grid points, in pixels.")
 
@@ -113,14 +114,17 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'num_tilts': ts.getDim()[-1],
             'pix_size': ts.getSamplingRate(),
             'tomo_size': tomo_size,
-            'sampling': self.sampling.get(),
+            'sampling': self.gridSampling.get(),
             'binning': self.ctfDownFactor.get(),
             'gpus': self.getGpuList(),
             'min_res': paramDict['lowRes'],
             'max_res': paramDict['highRes'],
             'def_min': paramDict['minDefocus'],
             'def_max': paramDict['maxDefocus'],
-            'patch_size': self.windowSize.get()
+            'patch_size': paramDict['windowSize'],
+            'voltage': paramDict['voltage'],
+            'sph_aber': paramDict['sphericalAberration'],
+            'amp_cont': paramDict['ampContrast']
         }
 
         jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
@@ -131,7 +135,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
                     env=Plugin.getEnviron())
 
         for i, ti in enumerate(self._tsDict.getTiList(tsId)):
-            ti.setCTF(self.getCtf(ti))
+            ti.setCTF(self.getCtf(tsObjId, ti))
 
         self._tsDict.setFinished(tsId)
 
@@ -152,16 +156,18 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         return os.path.join(prefix,
                             ts.getFirstItem().parseFileName(extension=ext))
 
-    def getPsdName(self, ti):
-        return '%s_PSD.mrc' % self.getTiPrefix(ti)
+    def getPsdName(self, tsObjId, ti):
+        return os.path.join(self._getExtraPath(tsObjId),
+                            f'ctf_grid/Tomo{tsObjId:03g}/???')
 
-    def getCtf(self, ti):
+    def getCtfName(self, tsObjId):
+        return os.path.join(self._getExtraPath(tsObjId),
+                            f'ctf_grid/Tomo{tsObjId:03g}/defocus.txt')
+
+    def getCtf(self, tsObjId, ti):
         """ Parse the CTF object estimated for this Tilt-Image. """
-        return None
-        psd = self.getPsdName(ti)
-        outCtf = self._getTmpPath(psd.replace('.mrc', '.txt'))
-        ctfModel = self._ctfProgram.parseOutputAsCtf(outCtf,
-                                                     psdFile=self._getExtraPath(ti.getTsId(), psd))
+        ctfModel = parseCtf(self.getCtfName(tsObjId), ti,
+                            psdFile=self.getPsdName(tsObjId, ti))
         ctfTomo = CTFTomo.ctfModelToCtfTomo(ctfModel)
 
         return ctfTomo
