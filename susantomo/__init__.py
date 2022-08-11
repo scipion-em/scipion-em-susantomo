@@ -79,9 +79,8 @@ class Plugin(pwem.Plugin):
             environ.set('PATH', os.environ['SUSAN_MPI_BIN'],
                         position=pwutils.Environ.BEGIN)
 
-        if 'PYTHONPATH' in environ:
-            # this is required for python virtual env to work
-            del environ['PYTHONPATH']
+        # This is required for SUSAN Python API to work
+        environ.update({'PYTHONPATH': cls.getHome()})
 
         return environ
 
@@ -110,7 +109,7 @@ class Plugin(pwem.Plugin):
                 f'cd {ENV_NAME} && cd dependencies && ',
                 f'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
                 f'cd ../+SUSAN && mkdir bin && cd bin && cmake3 .. && ',
-                f'cd +SUSAN/bin && make -j {env.getProcessors()}']
+                f'make -j {env.getProcessors()}']
 
             susanCmds = [(" ".join(installCmds), '+SUSAN/bin/susan_aligner_mpi')]
 
@@ -132,3 +131,10 @@ class Plugin(pwem.Plugin):
         """ Return the env name that is currently active. """
         envVar = cls.getVar(SUSAN_ENV_ACTIVATION)
         return envVar.split()[-1].split("-")[-1]
+
+    @classmethod
+    def getProgram(cls, script):
+        scriptFn = os.path.join(__path__[0], f'scripts/{script}')
+        cmd = f"{Plugin.getActivationCmd()} && python3 {scriptFn} "
+
+        return cmd

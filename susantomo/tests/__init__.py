@@ -1,4 +1,3 @@
-# coding: utf-8
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
@@ -24,16 +23,16 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-@article{Sanchez2019,
-  author={Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  booktitle={27th European Signal Processing Conference (EUSIPCO)},
-  title={Fast Alignment of Limited Angle Tomograms by projected Cross Correlation},
-  year={2019},
-  volume={},
-  number={},
-  pages={1-5},
-  doi={10.23919/EUSIPCO.2019.8903041}
-  }
 
-"""
+from pyworkflow.tests import DataSet
+from pyworkflow.utils import weakImport
+
+
+with weakImport("tomo"):
+    from .test_protocols_susan import TestSusanCtf
+
+DataSet(name='tutorialDataImodCTF',
+        folder='tutorialDataImodCTF',
+        files={
+            'tsCtf1': 'WTI042413_1series4.mrc'
+        })

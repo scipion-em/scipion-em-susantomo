@@ -25,92 +25,157 @@
 # **************************************************************************
 
 import os
-import sys
+import json
+from enum import Enum
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import NEW
-from pwem.protocols import ProtAnalysis3D
-from pwem.objects import Volume
-from pwem.emlib.image import ImageHandler
+import pyworkflow.utils as pwutils
+from pwem.objects import CTFModel
 
-from susantomo import Plugin
+from tomo.objects import CTFTomo, SetOfCTFTomoSeries
+from tomo.protocols.protocol_ts_estimate_ctf import ProtTsEstimateCTF
+
+from .. import Plugin
+from ..convert import parseImodCtf, readCtfModel
 
 
-class ProtSusanEstimateCtf(ProtAnalysis3D):
-    """
-    Protocol for ...
-    """
+class outputs(Enum):
+    outputCTFs = SetOfCTFTomoSeries
+
+
+class ProtSusanEstimateCtf(ProtTsEstimateCTF):
+    """ CTF estimation on a set of tilt series using SUSAN. """
     _label = 'ctf estimation'
     _devStatus = NEW
-    _possibleOutputs = {
+    _possibleOutputs = outputs
 
-    }
+    # -------------------------- DEFINE param functions -----------------------
+    def _defineProcessParams(self, form):
+        form.addHidden(params.GPU_LIST, params.StringParam,
+                       default='0', label="Choose GPU IDs")
 
-    def _createFilenameTemplates(self):
-        """ Centralize how files are called. """
-        myDict = {
-                  }
+        form.addParam('tomoSize', params.IntParam,
+                      default=800, label='Tomogram thickness (voxels)',
+                      help='Z height of the reconstructed volume in '
+                           '*unbinned* voxels.')
 
-        self._updateFilenamesDict(myDict)
+        form.addParam('gridSampling', params.IntParam, default=180,
+                      label="CTF grid spacing (px)",
+                      help="Spacing between grid points, in pixels.")
 
-    # --------------------------- DEFINE param functions ----------------------
+        group = form.addGroup('Search limits')
+        line = group.addLine('Resolution (A)',
+                             help='The CTF model will be fit to regions '
+                                  'of the amplitude spectrum corresponding '
+                                  'to this range of resolution.')
+        line.addParam('lowRes', params.FloatParam, default=30., label='Min')
+        line.addParam('highRes', params.FloatParam, default=5., label='Max')
 
-    def _defineParams(self, form):
-        form.addSection(label='Input')
+        line = group.addLine('Defocus search range (A)',
+                             help='Select _minimum_ and _maximum_ values for '
+                                  'defocus search range (in A). Underfocus'
+                                  ' is represented by a positive number.')
+        line.addParam('minDefocus', params.FloatParam, default=5000.,
+                      label='Min')
+        line.addParam('maxDefocus', params.FloatParam, default=50000.,
+                      label='Max')
 
-        form.addParallelSection(threads=1, mpi=0)
+        form.addParam('ctfDownFactor', params.FloatParam, default=1.,
+                      label='CTF Downsampling factor',
+                      help='')
 
-    # --------------------------- INSERT steps functions ----------------------
-    
-    def _insertAllSteps(self):
-        #self._createFilenameTemplates()
-        self._insertFunctionStep('createOutputStep')
+        form.addParam('windowSize', params.IntParam, default=512,
+                      label='FFT box size (px)',
+                      help='')
+
+        form.addParallelSection(threads=1, mpi=1)
 
     # --------------------------- STEPS functions -----------------------------
+    def processTiltSeriesStep(self, tsObjId):
+        """Run susan_estimate_ctf program"""
+        ts = self._getTiltSeries(tsObjId)
+        tsId = ts.getTsId()
+        extraPrefix = self._getExtraPath(tsId)
+        tmpPrefix = self._getTmpPath(tsId)
+        pwutils.makePath(tmpPrefix)
+        pwutils.makePath(extraPrefix)
 
-    def createOutputStep(self):
-        sys.path.insert(0, Plugin.getHome())
-        import susan as SUSAN
+        ts.applyTransform(self.getFilePath(tsObjId, tmpPrefix, ".mrc"))
+        ts.generateTltFile(self.getFilePath(tsObjId, tmpPrefix, ".tlt"))
 
-        os.chdir("/lmb/home/gsharov/cephfs/data/susan_tutorial")
-        N = 4  # number of tilt series (TS) to process together
-        K = 59 # maximal number of projections in processed TS
-        tomos = SUSAN.data.Tomograms(None, N, K)
-        apix = 2.62            # angstroms per pixel
-        tsiz = [3710, 3710, 1400] # pixels (should be the same for all processed TS)
+        paramDict = self.getCtfParamsDict()
+        tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
+        ts_num = ts.getObjId()
 
-        for i in range(N):
-            tomo_base = './mixedCTEM_tomo%d%s'
-            tomos.tomo_id[i] = i+1
-            tomos.set_stack(i, tomo_base % (i+1, '.b1.ali.mrc'))
-            tomos.set_angles(i, tomo_base % (i+1, '.tlt'))
-            tomos.pix_size[i] = apix
-            tomos.tomo_size[i] = tsiz
+        params = {
+            'ts_num': ts_num,
+            'inputStack': self.getFilePath(tsObjId, tmpPrefix, ".mrc"),
+            'inputAngles': self.getFilePath(tsObjId, tmpPrefix, ".tlt"),
+            'output_dir': extraPrefix,
+            'num_tilts': ts.getDim()[-1],
+            'pix_size': ts.getSamplingRate(),
+            'tomo_size': tomo_size,
+            'sampling': self.gridSampling.get(),
+            'binning': self.ctfDownFactor.get(),
+            'gpus': self.getGpuList(),
+            'min_res': paramDict['lowRes'],
+            'max_res': paramDict['highRes'],
+            'def_min': paramDict['minDefocus'],
+            'def_max': paramDict['maxDefocus'],
+            'patch_size': paramDict['windowSize'],
+            'voltage': paramDict['voltage'],
+            'sph_aber': paramDict['sphericalAberration'],
+            'amp_cont': paramDict['ampContrast']
+        }
 
-        tomos.save('tomos_raw_b1.tomostxt')
+        jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
+        with open(jsonFn, "w") as fn:
+            json.dump(params, fn, indent=4)
 
-        raise Exception("lala")
-        test = ""
-        self.runJob(test, "",
-                    cwd=self._getExtraPath(),
+        self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
                     env=Plugin.getEnviron())
 
-        #outputs = {'outputVolume1': vol,
-        #           'outputVolume2': vol2}
-        #self._defineOutputs(**outputs)
-        #self._defineSourceRelation(inputVol, vol)
-        #self._defineSourceRelation(inputVol, vol2)
+        ctfs, psds = self.getCtf(tsObjId, ts_num)
+        for i, ti in enumerate(self._tsDict.getTiList(tsId)):
+            ti.setCTF(self.getCtfTi(ctfs, i, psds))
+
+        self._tsDict.setFinished(tsId)
 
     # --------------------------- INFO functions ------------------------------
-    
-    def _summary(self):
-        summary = []
-
-        return summary
-    
     def _validate(self):
         errors = []
 
         return errors
-    
+
     # --------------------------- UTILS functions -----------------------------
+    def _doInsertTiltImageSteps(self):
+        """ Default True, but if return False, the steps for each
+        TiltImage will not be inserted. """
+        return False
+
+    def getFilePath(self, tsObjId, prefix, ext=None):
+        ts = self._getTiltSeries(tsObjId)
+        return os.path.join(prefix,
+                            ts.getFirstItem().parseFileName(extension=ext))
+
+    def getOutputPath(self, tsObjId, tsNum):
+        return os.path.join(self._getExtraPath(tsObjId),
+                            f'ctf_grid/Tomo{tsNum:03d}')
+
+    def getCtf(self, tsObjId, tsNum):
+        """ Parse the CTF object estimated for this Tilt-Image. """
+        ctfList = parseImodCtf(os.path.join(self.getOutputPath(tsObjId, tsNum),
+                                            "defocus.txt"))
+        psdFile = os.path.join(self.getOutputPath(tsObjId, tsNum),
+                               "ctf_fitting_result.mrc")
+        return ctfList, psdFile
+
+    def getCtfTi(self, ctfList, ti, psdFiles):
+        """ Parse the CTF object estimated for this Tilt-Image. """
+        ctf = CTFModel()
+        readCtfModel(ctf, ctfList, ti)
+        ctf.setPsdFile(f"{ti+1}@" + psdFiles)
+        ctfTomo = CTFTomo.ctfModelToCtfTomo(ctf)
+
+        return ctfTomo

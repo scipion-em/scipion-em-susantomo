@@ -1,4 +1,3 @@
-# coding: utf-8
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
@@ -24,16 +23,36 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-@article{Sanchez2019,
-  author={Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  booktitle={27th European Signal Processing Conference (EUSIPCO)},
-  title={Fast Alignment of Limited Angle Tomograms by projected Cross Correlation},
-  year={2019},
-  volume={},
-  number={},
-  pages={1-5},
-  doi={10.23919/EUSIPCO.2019.8903041}
-  }
 
-"""
+def parseImodCtf(ctfFn):
+    with open(ctfFn) as fn:
+        lines = fn.readlines()
+        result = []
+        for line in lines:
+            if line:
+                ctfValues = map(float, [i.strip() for i in line.split()])
+                result.append(ctfValues)
+
+    return result
+
+
+def setWrongDefocus(ctfModel):
+    ctfModel.setDefocusU(-999)
+    ctfModel.setDefocusV(-1)
+    ctfModel.setDefocusAngle(-999)
+
+
+def readCtfModel(ctfModel, ctfList, ti):
+    if ctfList is None:
+        setWrongDefocus(ctfModel)
+        ctfFit, ctfResolution, ctfPhaseShift = -999, -999, 0
+    else:
+        # 8-column list
+        defocusU, defocusV, defocusAngle, ctfPhaseShift, _, _, ctfResolution, ctfFit = ctfList[ti]
+        ctfModel.setStandardDefocus(defocusU, defocusV, defocusAngle)
+    ctfModel.setFitQuality(ctfFit)
+    ctfModel.setResolution(ctfResolution)
+
+    # Avoid creation of phaseShift
+    if ctfPhaseShift != 0:
+        ctfModel.setPhaseShift(ctfPhaseShift)
