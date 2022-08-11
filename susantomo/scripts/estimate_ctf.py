@@ -68,7 +68,7 @@ def estimateCtf(params, ts_id, output_dir):
     ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
     ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms
     ctf_est.defocus_angstroms.max_val = params['def_max']  # angstroms
-    ctf_est.estimate('ctf_grid',
+    ctf_est.estimate(os.path.join(output_dir, 'ctf_grid'),
                      os.path.join(output_dir, f"tomo{ts_id}.tomostxt"),
                      os.path.join(output_dir, "grid_ctf.ptclsraw"),
                      params['patch_size'])

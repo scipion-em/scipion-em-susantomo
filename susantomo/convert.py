@@ -33,6 +33,8 @@ def parseImodCtf(ctfFn):
                 ctfValues = map(float, [i.strip() for i in line.split()])
                 result.append(ctfValues)
 
+    return result
+
 
 def setWrongDefocus(ctfModel):
     ctfModel.setDefocusU(-999)
