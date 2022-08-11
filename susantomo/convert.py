@@ -24,11 +24,33 @@
 # *
 # **************************************************************************
 
-import csv
+def parseImodCtf(ctfFn):
+    with open(ctfFn) as fn:
+        lines = fn.readlines()
+        result = []
+        for line in lines:
+            if line:
+                ctfValues = map(float, [i.strip() for i in line.split()])
+                result.append(ctfValues)
 
 
-def parseCtf(ctfFile, ti, psd):
-    with open(ctfFile) as fn:
-        reader = csv.reader(fn, delimiter='\t', quotechar='|')
+def setWrongDefocus(ctfModel):
+    ctfModel.setDefocusU(-999)
+    ctfModel.setDefocusV(-1)
+    ctfModel.setDefocusAngle(-999)
 
-    ctf_line = reader[ti]
+
+def readCtfModel(ctfModel, ctfList, ti):
+    if ctfList is None:
+        setWrongDefocus(ctfModel)
+        ctfFit, ctfResolution, ctfPhaseShift = -999, -999, 0
+    else:
+        # 8-column list
+        defocusU, defocusV, defocusAngle, ctfPhaseShift, _, _, ctfResolution, ctfFit = ctfList[ti]
+        ctfModel.setStandardDefocus(defocusU, defocusV, defocusAngle)
+    ctfModel.setFitQuality(ctfFit)
+    ctfModel.setResolution(ctfResolution)
+
+    # Avoid creation of phaseShift
+    if ctfPhaseShift != 0:
+        ctfModel.setPhaseShift(ctfPhaseShift)

@@ -31,12 +31,13 @@ from enum import Enum
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import NEW
 import pyworkflow.utils as pwutils
+from pwem.objects import CTFModel
 
 from tomo.objects import CTFTomo, SetOfCTFTomoSeries
 from tomo.protocols.protocol_ts_estimate_ctf import ProtTsEstimateCTF
 
 from .. import Plugin
-from ..convert import parseCtf
+from ..convert import parseImodCtf, readCtfModel
 
 
 class outputs(Enum):
@@ -105,9 +106,10 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
 
         paramDict = self.getCtfParamsDict()
         tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
+        ts_num = ts.getObjId()
 
         params = {
-            'ts_num': ts.getObjId(),
+            'ts_num': ts_num,
             'inputStack': self.getFilePath(tsObjId, tmpPrefix, ".mrc"),
             'inputAngles': self.getFilePath(tsObjId, tmpPrefix, ".tlt"),
             'output_dir': extraPrefix,
@@ -134,8 +136,9 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
                     env=Plugin.getEnviron())
 
+        ctfs, psds = self.getCtf(tsObjId, ts_num)
         for i, ti in enumerate(self._tsDict.getTiList(tsId)):
-            ti.setCTF(self.getCtf(tsObjId, ti))
+            ti.setCTF(self.getCtfTi(ctfs, i, psds))
 
         self._tsDict.setFinished(tsId)
 
@@ -156,18 +159,23 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         return os.path.join(prefix,
                             ts.getFirstItem().parseFileName(extension=ext))
 
-    def getPsdName(self, tsObjId, ti):
+    def getOutputPath(self, tsObjId, tsNum):
         return os.path.join(self._getExtraPath(tsObjId),
-                            f'ctf_grid/Tomo{tsObjId:03g}/???')
+                            f'ctf_grid/Tomo{tsNum:03d}')
 
-    def getCtfName(self, tsObjId):
-        return os.path.join(self._getExtraPath(tsObjId),
-                            f'ctf_grid/Tomo{tsObjId:03g}/defocus.txt')
-
-    def getCtf(self, tsObjId, ti):
+    def getCtf(self, tsObjId, tsNum):
         """ Parse the CTF object estimated for this Tilt-Image. """
-        ctfModel = parseCtf(self.getCtfName(tsObjId), ti,
-                            psdFile=self.getPsdName(tsObjId, ti))
-        ctfTomo = CTFTomo.ctfModelToCtfTomo(ctfModel)
+        ctfList = parseImodCtf(os.path.join(self.getOutputPath(tsObjId, tsNum),
+                                            "defocus.txt"))
+        psdFile = os.path.join(self.getOutputPath(tsObjId, tsNum),
+                               "ctf_fitting_result.mrc")
+        return ctfList, psdFile
+
+    def getCtfTi(self, ctfList, ti, psdFiles):
+        """ Parse the CTF object estimated for this Tilt-Image. """
+        ctf = CTFModel()
+        readCtfModel(ctf, ctfList, ti)
+        ctf.setPsdFile(f"{ti+1}@" + psdFiles)
+        ctfTomo = CTFTomo.ctfModelToCtfTomo(ctf)
 
         return ctfTomo

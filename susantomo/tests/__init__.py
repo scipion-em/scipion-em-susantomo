@@ -34,5 +34,5 @@ with weakImport("tomo"):
 DataSet(name='tutorialDataImodCTF',
         folder='tutorialDataImodCTF',
         files={
-            'tsCtf1': 'WTI042413_1series4.st'
+            'tsCtf1': 'WTI042413_1series4.mrc'
         })
