@@ -64,6 +64,7 @@ def estimateCtf(params, ts_id, output_dir):
     ctf_est = SUSAN.modules.CtfEstimator()
     ctf_est.binning = params['binning']
     ctf_est.list_gpus_ids = list(params['gpus'])  # ID's of GPUs to use
+    ctf_est.threads_per_gpu = params['thr_per_gpu']
     ctf_est.resolution_angs.min_val = params['min_res']  # angstroms
     ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
     ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms

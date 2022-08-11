@@ -26,6 +26,7 @@
 
 import os
 import json
+import math
 from enum import Enum
 
 import pyworkflow.protocol.params as params
@@ -83,11 +84,18 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
 
         form.addParam('ctfDownFactor', params.FloatParam, default=1.,
                       label='CTF Downsampling factor',
-                      help='')
+                      help='Set to 1 for no downsampling. '
+                           'This downsampling is only used '
+                           'for estimating the CTF and it does not affect any '
+                           'further calculation. Ideally the estimation of the '
+                           'CTF is optimal when the Thon rings are not too '
+                           'concentrated at the origin (too small to be seen) '
+                           'and not occupying the whole power spectrum (since '
+                           'this downsampling might entail aliasing).')
 
         form.addParam('windowSize', params.IntParam, default=512,
                       label='FFT box size (px)',
-                      help='')
+                      help='Boxsize in pixels to be used for FFT')
 
         form.addParallelSection(threads=1, mpi=1)
 
@@ -117,7 +125,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'pix_size': ts.getSamplingRate(),
             'tomo_size': tomo_size,
             'sampling': self.gridSampling.get(),
-            'binning': self.ctfDownFactor.get(),
+            'binning': int(math.log2(self.ctfDownFactor.get())),
             'gpus': self.getGpuList(),
             'min_res': paramDict['lowRes'],
             'max_res': paramDict['highRes'],
@@ -126,7 +134,8 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'patch_size': paramDict['windowSize'],
             'voltage': paramDict['voltage'],
             'sph_aber': paramDict['sphericalAberration'],
-            'amp_cont': paramDict['ampContrast']
+            'amp_cont': paramDict['ampContrast'],
+            'thr_per_gpu': self.numberOfThreads.get()
         }
 
         jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
@@ -145,6 +154,9 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
         errors = []
+
+        if self.numberOfMpi.get() > 1:
+            errors.append("MPI not supported, use threads (per GPU) instead.")
 
         return errors
 
