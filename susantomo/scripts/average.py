@@ -33,6 +33,7 @@ inside its conda environment.
 import os
 import sys
 import json
+import numpy as np
 
 import susan as SUSAN
 
@@ -48,36 +49,35 @@ def createTomoFile(params, ts_id, output_dir):
     tomos.voltage[0] = params['voltage']
     tomos.amp_cont[0] = params['amp_cont']
     tomos.sph_aber[0] = params['sph_aber']
-    #tomos.set_defocus(0, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
+    tomos.set_defocus(0, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
 
     tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
 
 
-def create2DGrid(params, ts_id, output_dir):
-    """ Create a 2D grid to estimate the CTF. """
+def createPtclsFile(params, ts_id, output_dir):
+    """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
+    parts = np.loadtxt(os.path.join(params['output_dir'], 'particles.tbl'), unpack=True)
     tomos = SUSAN.read(os.path.join(params['output_dir'], f"tomo{ts_id}.tomostxt"))
-    grid = SUSAN.data.Particles.grid_2d(tomos, step_pixels=params['sampling'])
-    grid.save(os.path.join(output_dir, "grid_ctf.ptclsraw"))
+    ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
+                                             position=parts[23:26, :].transpose(),
+                                             ptcls_id=parts[0],
+                                             tomos_id=parts[19])
+    ptcls.save(os.path.join(output_dir, 'particles.ptclsraw'))
 
 
-def estimateCtf(params, ts_id, output_dir):
-    """ Run CTF estimator. """
-    ctf_est = SUSAN.modules.CtfEstimator()
-    ctf_est.binning = params['binning']
-    ctf_est.list_gpus_ids = list(params['gpus'])  # ID's of GPUs to use
-    ctf_est.threads_per_gpu = params['thr_per_gpu']
-    ctf_est.resolution_angs.min_val = params['min_res']  # angstroms
-    ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
-    ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms
-    ctf_est.defocus_angstroms.max_val = params['def_max']  # angstroms
-    ctf_est.estimate(os.path.join(output_dir, 'ctf_grid'),
+def reconstructAvg(params, ts_id, output_dir):
+    """ Reconstruct an average 3D volume. """
+    avgr = SUSAN.modules.Averager()
+    avgr.list_gpus_ids = list(params['gpus'])
+    avgr.threads_per_gpu = params['thr_per_gpu']
+    avgr.ctf_correction = params['ctf_corr']
+    avgr.rec_halfsets = bool(params['do_halfsets'])
+    avgr.symmetry = params['symmetry']
+    avgr.padding_type = params['padding']
+    avgr.reconstruct(os.path.join(output_dir, "average"),
                      os.path.join(output_dir, f"tomo{ts_id}.tomostxt"),
-                     os.path.join(output_dir, "grid_ctf.ptclsraw"),
-                     params['patch_size'])
-
-    #tomos = SUSAN.read(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
-    #tomos.set_defocus(0, os.path.join(output_dir, f'ctf_grid/Tomo{ts_id:03g}/defocus.txt'))
-    #tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
+                     os.path.join(output_dir, "particles.ptclsraw"),
+                     box_size=params['boxsize'])
 
 
 if __name__ == '__main__':
@@ -91,8 +91,8 @@ if __name__ == '__main__':
                 ts_id = params['ts_num']  # integer
 
             createTomoFile(params, ts_id, output_dir)
-            create2DGrid(params, ts_id, output_dir)
-            estimateCtf(params, ts_id, output_dir)
+            createPtclsFile(params, ts_id, output_dir)
+            reconstructAvg(params, ts_id, output_dir)
         else:
             raise FileNotFoundError(inputJson)
     else:
