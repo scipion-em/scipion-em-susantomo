@@ -30,15 +30,16 @@ import math
 from enum import Enum
 
 import pyworkflow.protocol.params as params
-from pyworkflow.constants import NEW
+from pyworkflow.constants import NEW, SCIPION_DEBUG_NOCLEAN
 import pyworkflow.utils as pwutils
 from pwem.objects import CTFModel
+from pwem import emlib
 
 from tomo.objects import CTFTomo, SetOfCTFTomoSeries
 from tomo.protocols.protocol_ts_estimate_ctf import ProtTsEstimateCTF
 
 from .. import Plugin
-from ..convert import parseImodCtf, readCtfModel
+from ..convert import parseImodCtf, readCtfModelStack
 
 
 class outputs(Enum):
@@ -100,17 +101,27 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         form.addParallelSection(threads=1, mpi=1)
 
     # --------------------------- STEPS functions -----------------------------
-    def processTiltSeriesStep(self, tsObjId):
+    def processTiltSeriesStep(self, tsId):
         """Run susan_estimate_ctf program"""
-        ts = self._getTiltSeries(tsObjId)
-        tsId = ts.getTsId()
+        ts = self._getTiltSeries(tsId)
         extraPrefix = self._getExtraPath(tsId)
         tmpPrefix = self._getTmpPath(tsId)
         pwutils.makePath(tmpPrefix)
         pwutils.makePath(extraPrefix)
+        tsInputFn = ts.getFirstItem().getFileName()
+        tsFn = self.getFilePath(tsId, tmpPrefix, ".mrc")
+        tiltFn = self.getFilePath(tsId, tmpPrefix, ".tlt")
 
-        ts.applyTransform(self.getFilePath(tsObjId, tmpPrefix, ".mrc"))
-        ts.generateTltFile(self.getFilePath(tsObjId, tmpPrefix, ".tlt"))
+        # has to be float32
+        ih = emlib.image.ImageHandler()
+        if ih.getDataType(tsInputFn) != emlib.DT_FLOAT:
+            ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
+        elif pwutils.getExt(tsInputFn) in ['.mrc', '.st', '.mrcs']:
+            pwutils.createAbsLink(os.path.abspath(tsInputFn), tsFn)
+        else:
+            ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
+
+        ts.generateTltFile(tiltFn)
 
         paramDict = self.getCtfParamsDict()
         tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
@@ -118,8 +129,8 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
 
         params = {
             'ts_num': ts_num,
-            'inputStack': self.getFilePath(tsObjId, tmpPrefix, ".mrc"),
-            'inputAngles': self.getFilePath(tsObjId, tmpPrefix, ".tlt"),
+            'inputStack': tsFn,
+            'inputAngles': tiltFn,
             'output_dir': extraPrefix,
             'num_tilts': ts.getDim()[-1],
             'pix_size': ts.getSamplingRate(),
@@ -138,18 +149,28 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'thr_per_gpu': self.numberOfThreads.get()
         }
 
-        jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
+        jsonFn = self.getFilePath(tsId, tmpPrefix, ".json")
         with open(jsonFn, "w") as fn:
             json.dump(params, fn, indent=4)
 
-        self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
-                    env=Plugin.getEnviron())
+        try:
+            self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
+                        env=Plugin.getEnviron())
 
-        ctfs, psds = self.getCtf(tsObjId, ts_num)
-        for i, ti in enumerate(self._tsDict.getTiList(tsId)):
-            ti.setCTF(self.getCtfTi(ctfs, i, psds))
+            outputLog = self.getOutputPath(tsId, ts_num) + "/defocus.txt"
+            ctfResult = parseImodCtf(outputLog)
+            psds = self.getOutputPath(tsId, ts_num) + "/ctf_fitting_result.mrc"
+            ctf = CTFModel()
 
-        self._tsDict.setFinished(tsId)
+            for i, ti in enumerate(self._tsDict.getTiList(tsId)):
+                ti.setCTF(self.getCtfTi(ctf, ctfResult, i, psds))
+
+            if not pwutils.envVarOn(SCIPION_DEBUG_NOCLEAN):
+                pwutils.cleanPath(tsFn)
+
+            self._tsDict.setFinished(tsId)
+        except Exception as e:
+            self.error(f"ERROR: Ctffind has failed for {tsFn}: {e}")
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -175,19 +196,10 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         return os.path.join(self._getExtraPath(tsObjId),
                             f'ctf_grid/Tomo{tsNum:03d}')
 
-    def getCtf(self, tsObjId, tsNum):
+    def getCtfTi(self, ctf, ctfArray, tiIndex, psdStack):
         """ Parse the CTF object estimated for this Tilt-Image. """
-        ctfList = parseImodCtf(os.path.join(self.getOutputPath(tsObjId, tsNum),
-                                            "defocus.txt"))
-        psdFile = os.path.join(self.getOutputPath(tsObjId, tsNum),
-                               "ctf_fitting_result.mrc")
-        return ctfList, psdFile
-
-    def getCtfTi(self, ctfList, ti, psdFiles):
-        """ Parse the CTF object estimated for this Tilt-Image. """
-        ctf = CTFModel()
-        readCtfModel(ctf, ctfList, ti)
-        ctf.setPsdFile(f"{ti+1}@" + psdFiles)
+        readCtfModelStack(ctf, ctfArray, item=tiIndex)
+        ctf.setPsdFile(f"{tiIndex + 1}@" + psdStack)
         ctfTomo = CTFTomo.ctfModelToCtfTomo(ctf)
 
         return ctfTomo

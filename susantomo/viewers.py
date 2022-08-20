@@ -24,6 +24,7 @@
 # *
 # **************************************************************************
 
+import os
 from matplotlib.figure import Figure
 
 from pwem.emlib.image import ImageHandler
@@ -57,8 +58,10 @@ class CtfEstimationTomoViewerSusan(CtfEstimationTomoViewer):
 
     def plot2D(self, ctfSet, ctfId):
         ctfModel = ctfSet[ctfId]
-        psdFn = ctfModel.getPsdFile()
-        img = ImageHandler().read(psdFn)
+        index, psdFn = ctfModel.getPsdFile().split("@")
+        if not os.path.exists(psdFn):
+            return None
+        img = ImageHandler().read((int(index), psdFn))
         fig = Figure(figsize=(7, 7), dpi=100)
         psdPlot = fig.add_subplot(111)
         psdPlot.get_xaxis().set_visible(False)

@@ -89,7 +89,7 @@ class Plugin(pwem.Plugin):
         """ Return a list of dependencies. Include conda if
         activation command was not found. """
         condaActivationCmd = cls.getCondaActivationCmd()
-        neededProgs = ['git', 'gcc', 'cmake3', 'make']
+        neededProgs = ['git', 'gcc', 'cmake', 'make']
         if not condaActivationCmd:
             neededProgs.append('conda')
 
@@ -106,12 +106,14 @@ class Plugin(pwem.Plugin):
                 f'pip install "numpy>=1.20" numba && ',
                 f'cd .. && rmdir susan-{ver} && ',
                 f'git clone https://github.com/rkms86/SUSAN {ENV_NAME} && ',
-                f'cd {ENV_NAME} && cd dependencies && ',
+                f'cd {ENV_NAME}/extern && ',
                 f'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
-                f'cd ../+SUSAN && mkdir bin && cd bin && cmake3 .. && ',
+                f'cd eigen && mkdir build && cd build && '
+                f'cmake ../ -DCMAKE_INSTALL_PREFIX=../../eigen_lib && make install && ',
+                f'cd ../../../ && mkdir bin && cd bin && cmake .. && ',
                 f'make -j {env.getProcessors()}']
 
-            susanCmds = [(" ".join(installCmds), '+SUSAN/bin/susan_aligner_mpi')]
+            susanCmds = [(" ".join(installCmds), 'bin/susan_aligner_mpi')]
 
             env.addPackage('susan', version=ver,
                            tar='void.tgz',

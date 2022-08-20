@@ -2,7 +2,7 @@
 SUSAN plugin
 ============
 
-This plugin provides wrappers for `Susan <https://github.com/KudryashevLab/SUSAN>`_ software: subtomogram averaging (StA) workflow for CryoET based on sub-stacks of images instead of sub-volumes of tomograms
+This plugin provides wrappers for `Susan <https://github.com/rkms86/SUSAN>`_ software: subtomogram averaging (StA) workflow for CryoET based on sub-stacks of images instead of sub-volumes of tomograms
 
 .. image:: https://img.shields.io/pypi/v/scipion-em-susantomo.svg
         :target: https://pypi.python.org/pypi/scipion-em-susantomo

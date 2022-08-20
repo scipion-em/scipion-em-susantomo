@@ -24,16 +24,24 @@
 # *
 # **************************************************************************
 
-def parseImodCtf(ctfFn):
-    with open(ctfFn) as fn:
-        lines = fn.readlines()
-        result = []
-        for line in lines:
-            if line:
-                ctfValues = map(float, [i.strip() for i in line.split()])
-                result.append(ctfValues)
+import os
+import numpy as np
+import logging
+logger = logging.getLogger(__name__)
 
-    return result
+
+def parseImodCtf(filename):
+    """ Retrieve defocus U, V and angle from the
+    output file of the susan execution.
+    :param filename: input file to parse
+    :return: an array with CTF values
+    """
+    if os.path.exists(filename):
+        return np.loadtxt(filename, dtype=float, comments='#')
+    else:
+        logger.error(f"Warning: Missing file: {filename}")
+
+    return None
 
 
 def setWrongDefocus(ctfModel):
@@ -42,13 +50,19 @@ def setWrongDefocus(ctfModel):
     ctfModel.setDefocusAngle(-999)
 
 
-def readCtfModel(ctfModel, ctfList, ti):
-    if ctfList is None:
+def readCtfModelStack(ctfModel, ctfArray, item=0):
+    """ Set values for the ctfModel from an input list.
+    :param ctfModel: output CTF model
+    :param ctfArray: array with CTF values
+    :param item: which row to use from ctfArray
+    """
+    if ctfArray is None or np.isnan(ctfArray[item]).any(axis=0):
         setWrongDefocus(ctfModel)
         ctfFit, ctfResolution, ctfPhaseShift = -999, -999, 0
     else:
         # 8-column list
-        defocusU, defocusV, defocusAngle, ctfPhaseShift, _, _, ctfResolution, ctfFit = ctfList[ti]
+        (defocusU, defocusV, defocusAngle, ctfPhaseShift,
+         _, _, ctfResolution, ctfFit) = ctfArray[item]
         ctfModel.setStandardDefocus(defocusU, defocusV, defocusAngle)
     ctfModel.setFitQuality(ctfFit)
     ctfModel.setResolution(ctfResolution)
