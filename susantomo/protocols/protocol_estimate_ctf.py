@@ -170,7 +170,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
 
             self._tsDict.setFinished(tsId)
         except Exception as e:
-            self.error(f"ERROR: Ctffind has failed for {tsFn}: {e}")
+            self.error(f"ERROR: SUSAN ctf estimation has failed for {tsFn}: {e}")
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):

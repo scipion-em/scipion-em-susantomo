@@ -56,7 +56,7 @@ def createTomoFile(params, ts_id, output_dir):
 
 def createPtclsFile(params, ts_id, output_dir):
     """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
-    parts = np.loadtxt(os.path.join(params['output_dir'], 'particles.tbl'), unpack=True)
+    parts = np.loadtxt(os.path.join(params['output_dir'], 'input_particles.tbl'), unpack=True)
     tomos = SUSAN.read(os.path.join(params['output_dir'], f"tomo{ts_id}.tomostxt"))
     ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
                                              position=parts[23:26, :].transpose(),

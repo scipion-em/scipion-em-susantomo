@@ -1,8 +1,12 @@
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
+# * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk) [1]
+# *              Estrella Fernandez Gimenez (me.fernandez@cnb.csic.es) [2]
 # *
 # * MRC Laboratory of Molecular Biology (MRC-LMB)
+# * [1] MRC Laboratory of Molecular Biology (MRC-LMB)
+# * [2] Unidad de Bioinformatica of Centro Nacional de Biotecnologia, CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -25,9 +29,12 @@
 # **************************************************************************
 
 import os
+import math
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
+
+import tomo.constants as const
 
 
 def parseImodCtf(filename):
@@ -70,3 +77,64 @@ def readCtfModelStack(ctfModel, ctfArray, item=0):
     # Avoid creation of phaseShift
     if ctfPhaseShift != 0:
         ctfModel.setPhaseShift(ctfPhaseShift)
+
+
+def writeDynTable(fhTable, setOfSubtomograms):
+    first = setOfSubtomograms.getFirstItem()
+    hasCoord = first.hasCoordinate3D()
+    hasTransform = first.hasTransform()
+    hasAcquisition = first.hasAcquisition()
+
+    for subtomo in setOfSubtomograms.iterSubtomos():
+        if hasCoord:
+            coord = subtomo.getCoordinate3D()
+            x = coord.getX(const.BOTTOM_LEFT_CORNER)
+            y = coord.getY(const.BOTTOM_LEFT_CORNER)
+            z = coord.getZ(const.BOTTOM_LEFT_CORNER)
+            tomo_id = coord.getTomoId()
+        else:
+            x = 0
+            y = 0
+            z = 0
+            tomo_id = 0
+        if hasTransform:
+            tdrot, tilt, narot, shiftx, shifty, shiftz = matrix2eulerAngles(subtomo.getTransform().getMatrix())
+        else:
+            tilt = 0
+            narot = 0
+            tdrot = 0
+            shiftx = 0
+            shifty = 0
+            shiftz = 0
+        if hasAcquisition:
+            acq = subtomo.getAcquisition()
+            anglemin = acq.getAngleMin()
+            anglemax = acq.getAngleMax()
+        else:
+            anglemin = 0
+            anglemax = 0
+        fhTable.write(f'{subtomo.getObjId():d} 1 1 {shiftx:d} {shifty:d} {shiftz:d} '
+                      f'{tdrot:f} {tilt:f} {narot:f} 0 0 0 1 {anglemin:d} {anglemax:d} '
+                      f'0 0 0 0 {tomo_id:d} 0 1 0 {x:0.2f} {y:0.2f} {z:d} 0 0 0 0 '
+                      f'0 1 0 0 0 0 0 0 0 0\n')
+
+
+# matrix2euler dynamo
+def matrix2eulerAngles(A):
+    tol = 1e-4
+    if abs(A[2, 2] - 1) < tol:
+        tilt = 0
+        narot = math.atan2(A[1, 0], A[0, 0]) * 180 / math.pi
+        tdrot = 0
+    elif abs(A[2, 2] + 1) < tol:
+        tdrot = 0
+        tilt = 180
+        narot = math.atan2(A[1, 0], A[0, 0]) * 180 / math.pi
+    else:
+        tdrot = math.atan2(A[2, 0], A[2, 1])
+        tilt = math.acos(A[2, 2])
+        narot = math.atan2(A[0, 2], -A[1, 2])
+    tilt = tilt * 180 / math.pi
+    narot = narot * 180 / math.pi
+    tdrot = tdrot * 180 / math.pi
+    return tdrot, tilt, narot, A[0, 3], A[1, 3], A[2, 3]
