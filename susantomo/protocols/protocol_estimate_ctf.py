@@ -30,7 +30,7 @@ import math
 from enum import Enum
 
 import pyworkflow.protocol.params as params
-from pyworkflow.constants import NEW, SCIPION_DEBUG_NOCLEAN
+from pyworkflow.constants import BETA, SCIPION_DEBUG_NOCLEAN
 import pyworkflow.utils as pwutils
 from pwem.objects import CTFModel
 from pwem import emlib
@@ -49,7 +49,7 @@ class outputs(Enum):
 class ProtSusanEstimateCtf(ProtTsEstimateCTF):
     """ CTF estimation on a set of tilt series using SUSAN. """
     _label = 'ctf estimation'
-    _devStatus = NEW
+    _devStatus = BETA
     _possibleOutputs = outputs
 
     # -------------------------- DEFINE param functions -----------------------

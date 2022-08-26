@@ -24,11 +24,10 @@
 # *
 # **************************************************************************
 
+# Supported versions:
+V0_1 = '0.1'
 
 SUSAN_HOME = 'SUSAN_HOME'
 SUSAN_CUDA_LIB = 'SUSAN_CUDA_LIB'
-DEFAULT_ACTIVATION_CMD = 'conda activate susan-0.1'
+DEFAULT_ACTIVATION_CMD = f'conda activate susan-{V0_1}'
 SUSAN_ENV_ACTIVATION = 'SUSAN_ENV_ACTIVATION'
-
-# Supported versions:
-V0_1 = '0.1'

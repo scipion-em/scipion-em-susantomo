@@ -1,10 +1,8 @@
 # **************************************************************************
 # *
-# * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk) [1]
 # *              Estrella Fernandez Gimenez (me.fernandez@cnb.csic.es) [2]
 # *
-# * MRC Laboratory of Molecular Biology (MRC-LMB)
 # * [1] MRC Laboratory of Molecular Biology (MRC-LMB)
 # * [2] Unidad de Bioinformatica of Centro Nacional de Biotecnologia, CSIC
 # *
