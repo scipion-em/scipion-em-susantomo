@@ -139,6 +139,6 @@ class Plugin(pwem.Plugin):
     @classmethod
     def getProgram(cls, script):
         scriptFn = os.path.join(__path__[0], f'scripts/{script}')
-        cmd = f"{Plugin.getActivationCmd()} && python3 {scriptFn} "
+        cmd = f"{cls.getActivationCmd()} && python3 {scriptFn} "
 
         return cmd
