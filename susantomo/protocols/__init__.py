@@ -25,3 +25,4 @@
 # **************************************************************************
 
 from .protocol_estimate_ctf import ProtSusanEstimateCtf
+from .protocol_average import ProtSusanAverage

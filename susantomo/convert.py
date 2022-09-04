@@ -77,19 +77,20 @@ def readCtfModelStack(ctfModel, ctfArray, item=0):
         ctfModel.setPhaseShift(ctfPhaseShift)
 
 
-def writeDynTable(fhTable, setOfSubtomograms):
+def writeDynTable(fhTable, setOfSubtomograms, scaleFactor=1.0):
     first = setOfSubtomograms.getFirstItem()
     hasCoord = first.hasCoordinate3D()
     hasTransform = first.hasTransform()
-    hasAcquisition = first.hasAcquisition()
+    hasAcquisition = setOfSubtomograms.hasAcquisition()
 
     for subtomo in setOfSubtomograms.iterSubtomos():
         if hasCoord:
             coord = subtomo.getCoordinate3D()
+            coord.scale(scaleFactor)
             x = coord.getX(const.BOTTOM_LEFT_CORNER)
             y = coord.getY(const.BOTTOM_LEFT_CORNER)
             z = coord.getZ(const.BOTTOM_LEFT_CORNER)
-            tomo_id = coord.getTomoId()
+            tomo_id = coord.getVolId()
         else:
             x = 0
             y = 0
@@ -97,6 +98,9 @@ def writeDynTable(fhTable, setOfSubtomograms):
             tomo_id = 0
         if hasTransform:
             tdrot, tilt, narot, shiftx, shifty, shiftz = matrix2eulerAngles(subtomo.getTransform().getMatrix())
+            shiftx *= scaleFactor
+            shifty *= scaleFactor
+            shiftz *= scaleFactor
         else:
             tilt = 0
             narot = 0
@@ -111,9 +115,9 @@ def writeDynTable(fhTable, setOfSubtomograms):
         else:
             anglemin = 0
             anglemax = 0
-        fhTable.write(f'{subtomo.getObjId():d} 1 1 {shiftx:d} {shifty:d} {shiftz:d} '
-                      f'{tdrot:f} {tilt:f} {narot:f} 0 0 0 1 {anglemin:d} {anglemax:d} '
-                      f'0 0 0 0 {tomo_id:d} 0 1 0 {x:0.2f} {y:0.2f} {z:d} 0 0 0 0 '
+        fhTable.write(f'{subtomo.getObjId()} 1 1 {shiftx} {shifty} {shiftz} '
+                      f'{tdrot} {tilt} {narot} 0 0 0 1 {anglemin} {anglemax} '
+                      f'0 0 0 0 {tomo_id} 0 1 0 {x} {y} {z} 0 0 0 0 '
                       f'0 1 0 0 0 0 0 0 0 0\n')
 
 
@@ -135,4 +139,5 @@ def matrix2eulerAngles(A):
     tilt = tilt * 180 / math.pi
     narot = narot * 180 / math.pi
     tdrot = tdrot * 180 / math.pi
+
     return tdrot, tilt, narot, A[0, 3], A[1, 3], A[2, 3]

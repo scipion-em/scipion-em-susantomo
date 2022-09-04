@@ -38,34 +38,37 @@ import numpy as np
 import susan as SUSAN
 
 
-def createTomoFile(params, ts_id, output_dir):
+def createTomosFile(params, output_dir):
     """ Create tomostxt file. """
-    tomos = SUSAN.data.Tomograms(n_tomo=1, n_proj=params['num_tilts'])
-    tomos.tomo_id[0] = ts_id
-    tomos.set_stack(0, params['inputStack'])
-    tomos.set_angles(0, params['inputAngles'])
-    tomos.pix_size[0] = params['pix_size']
-    tomos.tomo_size[0] = tuple(params['tomo_size'])
-    tomos.voltage[0] = params['voltage']
-    tomos.amp_cont[0] = params['amp_cont']
-    tomos.sph_aber[0] = params['sph_aber']
-    tomos.set_defocus(0, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
+    n_tomo = len(params['ts_nums'])
+    tomos = SUSAN.data.Tomograms(n_tomo=n_tomo,
+                                 n_proj=params['num_tilts'])
+    for i in range(n_tomo):
+        tomos.tomo_id[i] = params['ts_nums'][i]
+        tomos.set_stack(i, params['inputStacks'][i])
+        tomos.set_angles(i, params['inputAngles'][i])
+        tomos.pix_size[i] = params['pix_size']
+        tomos.tomo_size[i] = tuple(params['tomo_size'])
+        tomos.voltage[i] = params['voltage']
+        tomos.amp_cont[i] = params['amp_cont']
+        tomos.sph_aber[i] = params['sph_aber']
+        #tomos.set_defocus(i, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
 
-    tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
+    tomos.save(os.path.join(output_dir, "input_tomos.tomostxt"))
 
 
-def createPtclsFile(params, ts_id, output_dir):
+def createPtclsFile(params, output_dir):
     """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
-    parts = np.loadtxt(os.path.join(params['output_dir'], 'input_particles.tbl'), unpack=True)
-    tomos = SUSAN.read(os.path.join(params['output_dir'], f"tomo{ts_id}.tomostxt"))
+    parts = np.loadtxt(os.path.join(params['output_dir'], '../tmp/input_particles.tbl'), unpack=True)
+    tomos = SUSAN.read(os.path.join(params['output_dir'], "input_tomos.tomostxt"))
     ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
                                              position=parts[23:26, :].transpose(),
                                              ptcls_id=parts[0],
                                              tomos_id=parts[19])
-    ptcls.save(os.path.join(output_dir, 'particles.ptclsraw'))
+    ptcls.save(os.path.join(output_dir, 'input_particles.ptclsraw'))
 
 
-def reconstructAvg(params, ts_id, output_dir):
+def reconstructAvg(params, output_dir):
     """ Reconstruct an average 3D volume. """
     avgr = SUSAN.modules.Averager()
     avgr.list_gpus_ids = list(params['gpus'])
@@ -75,9 +78,9 @@ def reconstructAvg(params, ts_id, output_dir):
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
     avgr.reconstruct(os.path.join(output_dir, "average"),
-                     os.path.join(output_dir, f"tomo{ts_id}.tomostxt"),
-                     os.path.join(output_dir, "particles.ptclsraw"),
-                     box_size=params['boxsize'])
+                     os.path.join(output_dir, "input_tomos.tomostxt"),
+                     os.path.join(output_dir, "input_particles.ptclsraw"),
+                     box_size=params['box_size'])
 
 
 if __name__ == '__main__':
@@ -88,11 +91,10 @@ if __name__ == '__main__':
             with open(inputJson) as fn:
                 params = json.load(fn)
                 output_dir = params['output_dir']
-                ts_id = params['ts_num']  # integer
 
-            createTomoFile(params, ts_id, output_dir)
-            createPtclsFile(params, ts_id, output_dir)
-            reconstructAvg(params, ts_id, output_dir)
+            createTomosFile(params, output_dir)
+            createPtclsFile(params, output_dir)
+            reconstructAvg(params, output_dir)
         else:
             raise FileNotFoundError(inputJson)
     else:

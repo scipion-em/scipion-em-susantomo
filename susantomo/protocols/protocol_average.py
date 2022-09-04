@@ -26,15 +26,14 @@
 
 import os
 import json
-import math
 from enum import Enum
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import NEW
 import pyworkflow.utils as pwutils
+from pwem import emlib
 
-from tomo.objects import SetOfSubTomograms
-from tomo.utils import getNonInterpolatedTsFromRelations
+from tomo.objects import SetOfCTFTomoSeries, AverageSubTomogram
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
@@ -42,11 +41,11 @@ from ..convert import writeDynTable
 
 
 class outputs(Enum):
-    outputSubtomograms = SetOfSubTomograms
+    outputAverage = AverageSubTomogram
 
 
 class ProtSusanAverage(ProtTomoSubtomogramAveraging):
-    """ Average and reconstruct a 3D volume (subtomogram). """
+    """ Average and reconstruct a 3D volume (subtomogram average). """
     _label = 'average and reconstruct 3D'
     _devStatus = NEW
     _possibleOutputs = outputs
@@ -63,31 +62,43 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
         form.addParam('inputSetOfSubTomograms', params.PointerParam,
                       pointerClass="SetOfSubTomograms",
                       important=True,
-                      label='Input set of Subtomograms',
+                      label='Input subtomograms',
                       help="Set of subtomograms that will be used to fetch "
                            "alignment and coordinates information.")
-        form.addParam('inputSetOfTiltSeries',
+        form.addParam('inputTiltSeries',
                       params.PointerParam,
-                      pointerClass='SetOfTiltSeries',
+                      pointerClass='SetOfTiltSeries, SetOfCTFTomoSeries',
                       important=True,
-                      label='Input set of Tilt-Series',
+                      label='Corresponding tilt-series or CTF tomo series',
                       help='Set of tilt-series that correspond to subtomograms. '
-                           'The matching is checked using tsId.')
+                           'The matching is done using tsId.')
+        form.addParam('tomoSize', params.IntParam,
+                      default=800, label='Tomogram thickness (px)',
+                      help='Z height of a tomogram volume in '
+                           'pixels. Required for tilt series stack.')
+        form.addParam('boxSize', params.IntParam,
+                      default=32, label='Output box size (voxels)',
+                      help='Size of the reconstructed average volume in '
+                           'voxels. Pixel size will be the same as input '
+                           'tilt series.')
 
         form.addParam('sym', params.StringParam,
                       default='c1',
                       label='Symmetry group',
                       help="Specify the particle symmetry.")
         form.addParam('ctfCorr', params.EnumParam,
+                      expertLevel=params.LEVEL_ADVANCED,
                       choices=['none', 'phase_flip', 'wiener', 'wiener_ssnr'],
                       default=2,
                       label="CTF correction method")
         form.addParam('norm', params.EnumParam,
+                      expertLevel=params.LEVEL_ADVANCED,
                       choices=['none', 'zero_mean', 'zero_mean_one_std',
                                'zero_mean_proj_weight'],
                       default=2,
                       label="Normalization type")
         form.addParam('padding', params.EnumParam,
+                      expertLevel=params.LEVEL_ADVANCED,
                       choices=['zero', 'noise'], default=1,
                       label="Padding type")
         form.addParam('doHalfSets', params.BooleanParam, default=False,
@@ -99,78 +110,91 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
     # --------------------------- INSERT steps functions ----------------------
 
     def _insertAllSteps(self):
-        self._insertFunctionStep('convertInputStep')
-        self._insertFunctionStep('averageStep')
-        self._insertFunctionStep('createOutputStep')
-        self._insertFunctionStep('closeSetsStep')
+        self._insertFunctionStep(self.convertInputStep)
+        self._insertFunctionStep(self.averageStep)
+        self._insertFunctionStep(self.createOutputStep)
 
     # --------------------------- STEPS functions -----------------------------
     def convertInputStep(self):
-        """Run susan_reconstruct program"""
-
-        # create ptcls tbl
+        """ Prepare input files. """
         inputSubTomos = self.inputSetOfSubTomograms.get()
-        fnTable = self._getExtraPath("input_particles.tbl")
+        fnTable = self._getTmpPath("input_particles.tbl")
+        factor = self.getScaleFactor()
         with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputSubTomos)
+            writeDynTable(fn, inputSubTomos, scaleFactor=factor)
 
-        # create tomos file
-        tsSet = self.inputSetOfTiltSeries.get()
+        tsSet = self._getInputTs()
         tsIds_from_ts = set(item.getTsId() for item in tsSet)
         tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
-        if tsIds_from_subtomos != tsIds_from_ts:
-            self.warning("Found tsId that did not match between "
-                         "provided tilt-series and subtomograms!")
+        if not tsIds_from_ts.issubset(tsIds_from_subtomos):
+            self.warning("Found subtomos with tsId that did not match "
+                         "provided tilt-series: "
+                         f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
+
+        self.stacks, self.tilts, self.ids = [], [], []
 
         for ts in tsSet:
             tsId = ts.getTsId()
-            ts.applyTransform(self._getTmpPath(tsId + ".mrc"))
-            ts.generateTltFile(self._getTmpPath(tsId + ".tlt"))
+            tsInputFn = ts.getFirstItem().getFileName()
+            tsFn = self._getTmpPath(tsId + ".mrc")
+            tiltFn = self._getTmpPath(tsId + ".tlt")
 
+            # has to be float32
+            ih = emlib.image.ImageHandler()
+            if ih.getDataType(tsInputFn) != emlib.DT_FLOAT:
+                ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
+            elif pwutils.getExt(tsInputFn) in ['.mrc', '.st', '.mrcs', '.ali']:
+                pwutils.createAbsLink(os.path.abspath(tsInputFn), tsFn)
+            else:
+                ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
 
+            ts.generateTltFile(tiltFn)
+            self.stacks.append(tsFn)
+            self.tilts.append(tiltFn)
+            self.ids.append(ts.getObjId())
 
-
-        tsId = ts.getTsId()
-        ts.generateTltFile(self.getFilePath(tsObjId, tmpPrefix, ".tlt"))
-
-        paramDict = self.getCtfParamsDict()
-        tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
-        ts_num = ts.getObjId()
+    def averageStep(self):
+        """ Run susan_reconstruct program. """
+        tsSet = self._getInputTs()
+        tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
 
         params = {
-            'ts_num': ts_num,
-            'inputStack': self.getFilePath(tsObjId, tmpPrefix, ".mrc"),
-            'inputAngles': self.getFilePath(tsObjId, tmpPrefix, ".tlt"),
-            'output_dir': extraPrefix,
-            'num_tilts': ts.getDim()[-1],
-            'pix_size': ts.getSamplingRate(),
+            'ts_nums': self.ids,
+            'inputStacks': self.stacks,
+            'inputAngles': self.tilts,
+            'output_dir': self._getExtraPath(),
+            'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
+            'pix_size': tsSet.getSamplingRate(),
             'tomo_size': tomo_size,
-            'sampling': self.gridSampling.get(),
-            'binning': int(math.log2(self.ctfDownFactor.get())),
+            'box_size': self.boxSize.get(),
             'gpus': self.getGpuList(),
-            'min_res': paramDict['lowRes'],
-            'max_res': paramDict['highRes'],
-            'def_min': paramDict['minDefocus'],
-            'def_max': paramDict['maxDefocus'],
-            'patch_size': paramDict['windowSize'],
-            'voltage': paramDict['voltage'],
-            'sph_aber': paramDict['sphericalAberration'],
-            'amp_cont': paramDict['ampContrast'],
-            'thr_per_gpu': self.numberOfThreads.get()
+            'voltage': tsSet.getAcquisition().getVoltage(),
+            'sph_aber': tsSet.getAcquisition().getSphericalAberration(),
+            'amp_cont': tsSet.getAcquisition().getAmplitudeContrast(),
+            'thr_per_gpu': self.numberOfThreads.get(),
+            'ctf_corr': self.getEnumText('ctfCorr'),
+            'do_halfsets': self.doHalfSets.get(),
+            'symmetry': self.sym.get(),
+            'padding': self.getEnumText('padding')
         }
 
-        jsonFn = self.getFilePath(tsObjId, tmpPrefix, ".json")
+        jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
             json.dump(params, fn, indent=4)
 
-        self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
+        self.runJob(Plugin.getProgram("average.py"), jsonFn,
                     env=Plugin.getEnviron())
 
-        ctfs, psds = self.getCtf(tsObjId, ts_num)
-        for i, ti in enumerate(self._tsDict.getTiList(tsId)):
-            ti.setCTF(self.getCtfTi(ctfs, i, psds))
+    def createOutputStep(self):
+        imgSet = self._getInputTs()
+        volume = AverageSubTomogram()
+        volumeFile = self._getExtraPath("average_class001.mrc")
+        volume.setFileName(volumeFile)
+        volume.setSamplingRate(imgSet.getSamplingRate())
+        #volume.fixMRCVolume()
 
-        self._tsDict.setFinished(tsId)
+        self._defineOutputs(**{outputs.outputAverage.name: volume})
+        self._defineSourceRelation(self.inputSetOfSubTomograms, volume)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -179,11 +203,12 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
         return errors
 
     # --------------------------- UTILS functions -----------------------------
-    def getFilePath(self, tsObjId, prefix, ext=None):
-        ts = self._getTiltSeries(tsObjId)
-        return os.path.join(prefix,
-                            ts.getFirstItem().parseFileName(extension=ext))
+    def _getInputTs(self, pointer=False):
+        if isinstance(self.inputTiltSeries.get(), SetOfCTFTomoSeries):
+            return self.inputTiltSeries.get().getSetOfTiltSeries(pointer=pointer)
+        return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
-    def getOutputPath(self, tsObjId, tsNum):
-        return os.path.join(self._getExtraPath(tsObjId),
-                            f'ctf_grid/Tomo{tsNum:03d}')
+    def getScaleFactor(self):
+        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
+        samplingRateTS = self._getInputTs().getSamplingRate()
+        return float(samplingRateSubtomos / samplingRateTS)
