@@ -82,14 +82,14 @@ def writeDynTable(fhTable, setOfSubtomograms, scaleFactor=1.0):
     hasCoord = first.hasCoordinate3D()
     hasTransform = first.hasTransform()
     hasAcquisition = setOfSubtomograms.hasAcquisition()
+    if hasAcquisition:
+        acq = setOfSubtomograms.getAcquisition()
 
     for subtomo in setOfSubtomograms.iterSubtomos():
         if hasCoord:
             coord = subtomo.getCoordinate3D()
             coord.scale(scaleFactor)
-            x = coord.getX(const.BOTTOM_LEFT_CORNER)
-            y = coord.getY(const.BOTTOM_LEFT_CORNER)
-            z = coord.getZ(const.BOTTOM_LEFT_CORNER)
+            x, y, z = coord.getPosition(const.BOTTOM_LEFT_CORNER)
             tomo_id = coord.getVolId()
         else:
             x = 0
@@ -109,7 +109,6 @@ def writeDynTable(fhTable, setOfSubtomograms, scaleFactor=1.0):
             shifty = 0
             shiftz = 0
         if hasAcquisition:
-            acq = subtomo.getAcquisition()
             anglemin = acq.getAngleMin()
             anglemax = acq.getAngleMax()
         else:
