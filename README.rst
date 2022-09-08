@@ -2,7 +2,10 @@
 SUSAN plugin
 ============
 
-This plugin provides wrappers for `Susan <https://github.com/rkms86/SUSAN>`_ software: subtomogram averaging (StA) workflow for CryoET based on sub-stacks of images instead of sub-volumes of tomograms
+This plugin provides wrappers for `Susan <https://github.com/rkms86/SUSAN>`_ software: subtomogram averaging (StA) workflow for CryoET based on sub-stacks of images instead of sub-volumes of tomograms.
+SUSAN uses substacks that are cropped on-the-fly from the aligned tilt-series stack and performs the CTF correction according to the selected operation (alignment or reconstruction). With this approach we decrease the
+computational resources needed in a typical subtomogram averaging pipeline, as we no longer need the CTF corrected stacks, the full tomogram reconstructions, or all the subtomograms in multiple binning
+stages.
 
 .. image:: https://img.shields.io/pypi/v/scipion-em-susantomo.svg
         :target: https://pypi.python.org/pypi/scipion-em-susantomo
@@ -69,8 +72,7 @@ Protocols
 ----------
 
 * ctf estimation
-* align 2D
-* align 3D
+* multi-reference alignment
 * average and reconstruct 3D
 
 References

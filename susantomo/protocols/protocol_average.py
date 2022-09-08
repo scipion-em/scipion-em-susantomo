@@ -70,7 +70,7 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                       params.PointerParam,
                       pointerClass='SetOfCTFTomoSeries, SetOfTiltSeries',
                       important=True,
-                      label='Corresponding CTF tomo series or tilt-series',
+                      label='CTF tomo series or tilt-series (aligned)',
                       help='Set of tilt-series that correspond to subtomograms. '
                            'The matching is done using tsId.')
         form.addParam('tomoSize', params.IntParam,
