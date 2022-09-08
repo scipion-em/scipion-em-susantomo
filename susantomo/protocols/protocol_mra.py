@@ -1,8 +1,10 @@
 # **************************************************************************
 # *
-# * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
+# * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk) [1]
+# * Authors:     Estrella Fernandez Gimenez (me.fernandez@cnb.csic.es) [2]
 # *
-# * MRC Laboratory of Molecular Biology (MRC-LMB)
+# * [1] MRC Laboratory of Molecular Biology (MRC-LMB)
+# * [2] BCU, Centro Nacional de Biotecnologia, CSIC
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -45,9 +47,9 @@ class outputs(Enum):
     outputAverage = AverageSubTomogram
 
 
-class ProtSusanAverage(ProtTomoSubtomogramAveraging):
-    """ Average and reconstruct a 3D volume (subtomogram average). """
-    _label = 'average and reconstruct 3D'
+class ProtSusanMRA(ProtTomoSubtomogramAveraging):
+    """ Align subtomograms using multiple references. """
+    _label = 'multi-reference alignment'
     _devStatus = BETA
     _possibleOutputs = outputs
 
@@ -82,16 +84,107 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                       help='Size of the reconstructed average volume in '
                            'voxels. Pixel size will be the same as input '
                            'tilt series.')
-
+        form.addParam('numberOfIters', params.IntParam,
+                      label='Iterations', default=5,
+                      help="Number of iterations to run.")
         form.addParam('sym', params.StringParam,
                       default='c1',
                       label='Symmetry group',
                       help="Specify the particle symmetry.")
-        form.addParam('ctfCorr', params.EnumParam,
-                      expertLevel=params.LEVEL_ADVANCED,
+        form.addParam('ctfCorrAln', params.EnumParam,
+                      choices=['none', 'on_reference', 'on_substack',
+                               'wiener_ssnr', 'wiener_white', 'cfsc'],
+                      default=1,
+                      label="CTF correction method (aligner)")
+
+        form.addSection(label='References')
+        form.addParam('generateRefs', params.BooleanParam,
+                      default=False, label='Generate reference(s) and mask(s)',
+                      help="Generate a sphere template(s) based on radius provided.")
+        form.addParam('nref', params.IntParam, label='Number of references for MRA',
+                      default=1, condition="generateRefs")
+        form.addParam('refRadius', params.StringParam, default='',
+                      condition="generateRefs",
+                      label="Radii for generated template(s)",
+                      help="Input values separated by a space.")
+        form.addParam('maskRadius', params.StringParam, default='',
+                      condition="generateRefs",
+                      label="Radii for generated mask(s)",
+                      help="Input values separated by a space. Values bigger "
+                           "than reference radii are expected.")
+
+        form.addParam('inputRefs', params.MultiPointerParam,
+                      pointerClass='Volume',
+                      allowsNull=True,
+                      label="Input reference(s)",
+                      condition="not generateRefs")
+        form.addParam('inputMasks', params.MultiPointerParam,
+                      condition="not generateRefs",
+                      label="Alignment mask(s)",
+                      pointerClass='VolumeMask',
+                      allowsNull=True,
+                      help='Need to have the same dimensions as the template. '
+                           'Masks order should match the references.')
+
+        form.addSection(label='Angular scanning')
+        form.addParam('coneRange', params.IntParam, label='Cone range', default=360,
+                      help="The first two Euler angles are used to define the orientation of the vertical axis of the "
+                           "protein. First Euler angle (tdrot) rotates the template around its z axis. Second Euler "
+                           "angle (tilt) rotates the template around its x axis. Susan scans for this axis inside a "
+                           "cone: The 'cone_range' parameter defines the angular aperture of this cone. 360 degrees is "
+                           "thus the value for a global scan. To skip the part of the angular search that looks for "
+                           "orientations, you have to set 'cone range' to 0, and 'cone_sampling' to 1")
+        form.addParam('coneSampling', params.IntParam, label='Cone sampling', default=60,
+                      help="This parameter expresses the discretization inside this cone. The sampling is given in "
+                           "degrees, and corresponds to a representative angular distance between two neighboring "
+                           "orientations inside the cone.")
+        form.addParam('inplaneRange', params.IntParam, label='Inplane rotation range', default=360,
+                      help='The third Euler angle ("narot") defines rotations about the new axis of the reference. 360 '
+                           'degrees is the value for a global scan. To skip the part of the angular search that looks '
+                           'for azimuthal rotations , you have to set 1)  "inplane range" to zero, and 2)  '
+                           '"inplane_sampling" to 1. Likewise, to skip the part of the angular search that looks for '
+                           'orientations, you have to manipulate the "cone" parameters: 1)  "cone range" to zero, and 2'
+                           ') "cone_sampling" to 1.')
+        form.addParam('inplaneSampling', params.IntParam, label='Inplane rotation sampling', default=45,
+                      help='Parameter "inplane_sampling" is associated with the "narot" angle (New Axis ROTation). 1) '
+                           'the axis of the template is rotated to a new orientation (defined by "tdrot" and "tilt"). 2'
+                           ') the rotated template rotates again on its new axis (an "inplane" rotation). "inplane_'
+                           'sampling" defines the angular interval (in degrees) between two of these inplane rotations')
+        form.addParam('refine', params.IntParam, label='Refine', default=5,
+                      help="How many refinement iterations are carried out on each single particle. This refinement "
+                           "when comparing rotations of the reference against the data, takes the best orientation and "
+                           "looks again with a finer sampling. The sampling in the refined search will be half of the "
+                           "sampling used in the original one.  The range of the refined search encompasses all the "
+                           "orientations that neighbour the best orientation found in the original search.")
+        form.addParam('refineFactor', params.IntParam, label='Refine factor', default=2,
+                      help="Controls the size of the angular neighborhood during the local refinement of the angular "
+                           "grid.")
+
+        form.addSection(label='Shifts & thresholds')
+        form.addParam('allowDrift', params.BooleanParam, default=True,
+                      label="Allow drift?",
+                      help="Take into account shifts from previous iteration. "
+                           "Equivalent to DYNAMO's area search modus 2.")
+        form.addParam('offsetRange', params.IntParam, default=20,
+                      label="Offset range (px)")
+        form.addParam('offsetStep', params.IntParam, default=2,
+                      label="Offset step (px)")
+        form.addParam('threshold', params.FloatParam,
+                      label='CC threshold', default=0.8,
+                      help='Threshold value for CC (cross-correlation). '
+                           'Determines the fraction of particles to be used '
+                           'for reconstruction.')
+        line = form.addLine("Band-pass filter (freq.)")
+        line.addParam('low', params.IntParam, label='Low frequency', default=32)
+        line.addParam('high', params.IntParam, label='High frequency', default=2)
+        form.addParam('incLowpass', params.BooleanParam, default=False,
+                      label="Increase the lowpass filter on each iteration?")
+
+        form.addSection(label='Averaging')
+        form.addParam('ctfCorrAvg', params.EnumParam,
                       choices=['none', 'phase_flip', 'wiener', 'wiener_ssnr'],
                       default=2,
-                      label="CTF correction method")
+                      label="CTF correction method (averager)")
         form.addParam('norm', params.EnumParam,
                       expertLevel=params.LEVEL_ADVANCED,
                       choices=['none', 'zero_mean', 'zero_mean_one_std',
@@ -103,16 +196,14 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                       choices=['zero', 'noise'], default=1,
                       label="Padding type")
         form.addParam('doHalfSets', params.BooleanParam, default=False,
-                      expertLevel=params.LEVEL_ADVANCED,
                       label="Reconstruct half-sets?")
 
         form.addParallelSection(threads=1, mpi=1)
 
     # --------------------------- INSERT steps functions ----------------------
-
     def _insertAllSteps(self):
         self._insertFunctionStep(self.convertInputStep)
-        self._insertFunctionStep(self.averageStep)
+        self._insertFunctionStep(self.mraStep)
         self._insertFunctionStep(self.createOutputStep)
 
     # --------------------------- STEPS functions -----------------------------
@@ -132,7 +223,7 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                          "provided tilt-series: "
                          f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
 
-        if self.ctfCorr.get():
+        if self.doCtf():
             # generate defocus files
             setOfCtfTomoSeries = self.inputTiltSeries.get()
             imodUtils = Domain.importFromPlugin('imod.utils')
@@ -140,6 +231,13 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                 tsId = ctf.getTsId()
                 defocusFilePath = self._getTmpPath(tsId + ".defocus")
                 imodUtils.generateDefocusIMODFileFromObject(ctf, defocusFilePath)
+
+        if self.generateRefs:
+            self.refs = self.refRadius.get().split()
+            self.masks = self.maskRadius.get().split()
+        else:
+            self.refs = [i.getFileName() for i in self.inputRefs.get()]
+            self.masks = [i.getFileName() for i in self.inputMasks.get()]
 
         self.stacks, self.tilts, self.ids = [], [], []
 
@@ -163,15 +261,19 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
             self.tilts.append(tiltFn)
             self.ids.append(ts.getObjId())
 
-    def averageStep(self):
-        """ Run susan_reconstruct program. """
+    def mraStep(self):
+        """ Run susan_aligner and susan_reconstruct programs. """
         tsSet = self._getInputTs()
         tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
 
         params = {
             'ts_nums': self.ids,
+            'refs_nums': self.nref.get() if self.generateRefs else len(self.refs),
+            'generate_refs': bool(self.generateRefs),
             'inputStacks': self.stacks,
             'inputAngles': self.tilts,
+            'inputRefs': self.refs,
+            'inputMasks': self.masks,
             'output_dir': self._getExtraPath(),
             'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
             'pix_size': tsSet.getSamplingRate(),
@@ -182,17 +284,29 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
             'sph_aber': tsSet.getAcquisition().getSphericalAberration(),
             'amp_cont': tsSet.getAcquisition().getAmplitudeContrast(),
             'thr_per_gpu': self.numberOfThreads.get(),
-            'ctf_corr': self.getEnumText('ctfCorr'),
+            'ctf_corr_avg': self.getEnumText('ctfCorrAvg'),
+            'ctf_corr_aln': self.getEnumText('ctfCorrAln'),
             'do_halfsets': self.doHalfSets.get(),
             'symmetry': self.sym.get(),
-            'padding': self.getEnumText('padding')
+            'padding': self.getEnumText('padding'),
+            'iter': self.numberOfIters.get(),
+            'allow_drift': bool(self.allowDrift),
+            'cc': self.threshold.get(),
+            'low': self.low.get(),
+            'high': self.high.get(),
+            'refine': self.refine.get(),
+            'refine_factor': self.refineFactor.get(),
+            'inc_lowpass': bool(self.incLowpass),
+            'angles': [self.coneRange.get(), self.coneSampling.get(),
+                       self.inplaneRange.get(), self.inplaneSampling.get()],
+            'offsets': [self.offsetRange.get(), self.offsetStep.get()]
         }
 
         jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
             json.dump(params, fn, indent=4)
 
-        self.runJob(Plugin.getProgram("average.py"), jsonFn,
+        self.runJob(Plugin.getProgram("mra.py"), jsonFn,
                     env=Plugin.getEnviron())
 
     def createOutputStep(self):
@@ -212,8 +326,8 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
     def _validate(self):
         errors = []
 
-        if self.ctfCorr.get() and isinstance(self.inputTiltSeries.get(),
-                                             SetOfTiltSeries):
+        if self.doCtf() and isinstance(self.inputTiltSeries.get(),
+                                       SetOfTiltSeries):
             errors.append("CTF correction requires that you provide "
                           "CTFTomoSeries as input")
 
@@ -229,3 +343,6 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
         samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
         return float(samplingRateSubtomos / samplingRateTS)
+
+    def doCtf(self):
+        return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
