@@ -31,9 +31,10 @@ from enum import Enum
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import NEW
 import pyworkflow.utils as pwutils
+from pyworkflow.plugin import Domain
 from pwem import emlib
 
-from tomo.objects import SetOfCTFTomoSeries, AverageSubTomogram
+from tomo.objects import SetOfCTFTomoSeries, SetOfTiltSeries, AverageSubTomogram
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
@@ -67,9 +68,9 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                            "alignment and coordinates information.")
         form.addParam('inputTiltSeries',
                       params.PointerParam,
-                      pointerClass='SetOfTiltSeries, SetOfCTFTomoSeries',
+                      pointerClass='SetOfCTFTomoSeries, SetOfTiltSeries',
                       important=True,
-                      label='Corresponding tilt-series or CTF tomo series',
+                      label='Corresponding CTF tomo series or tilt-series',
                       help='Set of tilt-series that correspond to subtomograms. '
                            'The matching is done using tsId.')
         form.addParam('tomoSize', params.IntParam,
@@ -131,6 +132,15 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                          "provided tilt-series: "
                          f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
 
+        if self.ctfCorr.get():
+            # generate defocus files
+            setOfCtfTomoSeries = self.inputTiltSeries.get()
+            imodUtils = Domain.importFromPlugin('imod.utils')
+            for ctf in setOfCtfTomoSeries:
+                tsId = ctf.getTsId()
+                defocusFilePath = self._getTmpPath(tsId + ".defocus")
+                imodUtils.generateDefocusIMODFileFromObject(ctf, defocusFilePath)
+
         self.stacks, self.tilts, self.ids = [], [], []
 
         for ts in tsSet:
@@ -191,7 +201,9 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
         volumeFile = self._getExtraPath("average_class001.mrc")
         volume.setFileName(volumeFile)
         volume.setSamplingRate(imgSet.getSamplingRate())
-        #volume.fixMRCVolume()
+        if self.doHalfSets:
+            volume.setHalfMaps([self._getExtraPath("average_class001_half1.mrc"),
+                                self._getExtraPath("average_class001_half2.mrc")])
 
         self._defineOutputs(**{outputs.outputAverage.name: volume})
         self._defineSourceRelation(self.inputSetOfSubTomograms, volume)
@@ -199,6 +211,11 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
         errors = []
+
+        if self.ctfCorr.get() and isinstance(self.inputTiltSeries.get(),
+                                             SetOfTiltSeries):
+            errors.append("CTF correction requires that you provide "
+                          "CTFTomoSeries as input")
 
         return errors
 

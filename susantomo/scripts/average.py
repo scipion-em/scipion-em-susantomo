@@ -52,7 +52,8 @@ def createTomosFile(params, output_dir):
         tomos.voltage[i] = params['voltage']
         tomos.amp_cont[i] = params['amp_cont']
         tomos.sph_aber[i] = params['sph_aber']
-        #tomos.set_defocus(i, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
+        if params['ctf_corr'] != 'none':
+            tomos.set_defocus(i, params['inputAngles'][i].replace(".tlt", ".defocus"))
 
     tomos.save(os.path.join(output_dir, "input_tomos.tomostxt"))
 
