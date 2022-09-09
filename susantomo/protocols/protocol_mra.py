@@ -114,7 +114,7 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
                       default=False, label='Generate reference(s) and mask(s)',
                       help="Generate a sphere template(s) based on radius provided.")
         form.addParam('nref', params.IntParam, label='Number of references for MRA',
-                      default=1, condition="generateRefs and not doContinue")
+                      default=2, condition="generateRefs and not doContinue")
         form.addParam('refRadius', params.StringParam, default='',
                       condition="generateRefs and not doContinue",
                       label="Radii for generated template(s)",
