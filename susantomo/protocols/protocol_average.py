@@ -49,7 +49,7 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
     """ Average and reconstruct a 3D volume (subtomogram average).
         This protocol is used to check subtomograms positions import.
     """
-    _label = 'average and reconstruct 3D'
+    _label = 'average and reconstruct'
     _devStatus = BETA
     _possibleOutputs = outputs
 
