@@ -46,13 +46,16 @@ class outputs(Enum):
 
 
 class ProtSusanAverage(ProtTomoSubtomogramAveraging):
-    """ Average and reconstruct a 3D volume (subtomogram average). """
+    """ Average and reconstruct a 3D volume (subtomogram average).
+        This protocol is used to check subtomograms positions import.
+    """
     _label = 'average and reconstruct 3D'
     _devStatus = BETA
     _possibleOutputs = outputs
 
     def __init__(self, **args):
         ProtTomoSubtomogramAveraging.__init__(self, **args)
+        self.stacks, self.tilts, self.ids = [], [], []
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
@@ -60,12 +63,11 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                        default='0', label="Choose GPU IDs")
 
         form.addSection(label='Input')
-        form.addParam('inputSetOfSubTomograms', params.PointerParam,
-                      pointerClass="SetOfSubTomograms",
+        form.addParam('inputSetOfCoords3D', params.PointerParam,
+                      pointerClass="SetOfCoordinates3D",
                       important=True,
-                      label='Input subtomograms',
-                      help="Set of subtomograms that will be used to fetch "
-                           "alignment and coordinates information.")
+                      label='Input 3D coordinates',
+                      help="Set of 3D coordinates defining subtomograms positions.")
         form.addParam('inputTiltSeries',
                       params.PointerParam,
                       pointerClass='SetOfCTFTomoSeries, SetOfTiltSeries',
@@ -83,12 +85,12 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                            'voxels. Pixel size will be the same as input '
                            'tilt series.')
 
+        form.addSection(label='Averaging')
         form.addParam('sym', params.StringParam,
                       default='c1',
                       label='Symmetry group',
                       help="Specify the particle symmetry.")
         form.addParam('ctfCorr', params.EnumParam,
-                      expertLevel=params.LEVEL_ADVANCED,
                       choices=['none', 'phase_flip', 'wiener', 'wiener_ssnr'],
                       default=2,
                       label="CTF correction method")
@@ -103,7 +105,6 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                       choices=['zero', 'noise'], default=1,
                       label="Padding type")
         form.addParam('doHalfSets', params.BooleanParam, default=False,
-                      expertLevel=params.LEVEL_ADVANCED,
                       label="Reconstruct half-sets?")
 
         form.addParallelSection(threads=1, mpi=1)
@@ -118,19 +119,25 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
     # --------------------------- STEPS functions -----------------------------
     def convertInputStep(self):
         """ Prepare input files. """
-        inputSubTomos = self.inputSetOfSubTomograms.get()
+        inputCoords = self.inputSetOfCoords3D.get()
         fnTable = self._getTmpPath("input_particles.tbl")
         factor = self.getScaleFactor()
-        with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputSubTomos, scaleFactor=factor)
+        if abs(factor - 1.0 > 0.00001):
+            self.info(f"Scaling coordinates by a factor of {factor:0.2f}")
 
         tsSet = self._getInputTs()
         tsIds_from_ts = set(item.getTsId() for item in tsSet)
-        tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
-        if not tsIds_from_ts.issubset(tsIds_from_subtomos):
-            self.warning("Found subtomos with tsId that did not match "
+        tsIds_from_coords = set(inputCoords.getPrecedentsInvolved().keys())
+        if not tsIds_from_ts.issubset(tsIds_from_coords):
+            self.warning("Found coords with tsId that did not match "
                          "provided tilt-series: "
-                         f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
+                         f"{set.difference(tsIds_from_coords, tsIds_from_ts)}")
+
+        angleMax = tsSet.getAcquisition().getAngleMax() or 0
+        angleMin = tsSet.getAcquisition().getAngleMin() or 0
+
+        with open(fnTable, 'w') as fn:
+            writeDynTable(fn, inputCoords, angleMin, angleMax, scaleFactor=factor)
 
         if self.ctfCorr.get():
             # generate defocus files
@@ -140,8 +147,6 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                 tsId = ctf.getTsId()
                 defocusFilePath = self._getTmpPath(tsId + ".defocus")
                 imodUtils.generateDefocusIMODFileFromObject(ctf, defocusFilePath)
-
-        self.stacks, self.tilts, self.ids = [], [], []
 
         for ts in tsSet:
             tsId = ts.getTsId()
@@ -206,7 +211,7 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
                                 self._getExtraPath("average_class001_half2.mrc")])
 
         self._defineOutputs(**{outputs.outputAverage.name: volume})
-        self._defineSourceRelation(self.inputSetOfSubTomograms, volume)
+        self._defineSourceRelation(self._getInputTs(pointer=True), volume)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -226,6 +231,6 @@ class ProtSusanAverage(ProtTomoSubtomogramAveraging):
         return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
     def getScaleFactor(self):
-        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
+        samplingRateCoords = self.inputSetOfCoords3D.get().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
-        return float(samplingRateSubtomos / samplingRateTS)
+        return samplingRateCoords / samplingRateTS

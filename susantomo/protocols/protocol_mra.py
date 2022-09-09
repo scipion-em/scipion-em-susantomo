@@ -28,33 +28,32 @@
 
 import os
 import json
-from enum import Enum
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
 import pyworkflow.utils as pwutils
 from pyworkflow.plugin import Domain
 from pwem import emlib
+from pwem.objects import Volume, VolumeMask
 
-from tomo.objects import SetOfCTFTomoSeries, SetOfTiltSeries, AverageSubTomogram
+from tomo.objects import (SetOfCTFTomoSeries, SetOfTiltSeries,
+                          AverageSubTomogram, SetOfAverageSubTomograms)
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
 from ..convert import writeDynTable
 
 
-class outputs(Enum):
-    outputAverage = AverageSubTomogram
-
-
 class ProtSusanMRA(ProtTomoSubtomogramAveraging):
     """ Align subtomograms using multiple references. """
     _label = 'multi-reference alignment'
     _devStatus = BETA
-    _possibleOutputs = outputs
+    _possibleOutputs = {'outputAverage': AverageSubTomogram,
+                        'outputAverages': SetOfAverageSubTomograms}
 
     def __init__(self, **args):
         ProtTomoSubtomogramAveraging.__init__(self, **args)
+        self.stacks, self.tilts, self.ids, self.refs, self.masks = [], [], [], [], []
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
@@ -62,18 +61,27 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
                        default='0', label="Choose GPU IDs")
 
         form.addSection(label='Input')
-        form.addParam('inputSetOfSubTomograms', params.PointerParam,
-                      pointerClass="SetOfSubTomograms",
+        form.addParam('doContinue', params.BooleanParam, default=False,
+                      label="Continue previous run?")
+        form.addParam('previousRun', params.PointerParam,
+                      pointerClass=self.getClassName(),
                       important=True,
-                      label='Input subtomograms',
-                      help="Set of subtomograms that will be used to fetch "
-                           "alignment and coordinates information.")
+                      allowsNull=True,
+                      condition="doContinue",
+                      label="Select previous run")
+        form.addParam('inputSetOfCoords3D', params.PointerParam,
+                      pointerClass="SetOfCoordinates3D",
+                      condition="not doContinue",
+                      important=True,
+                      label='Input 3D coordinates',
+                      help="Set of 3D coordinates defining subtomograms positions.")
         form.addParam('inputTiltSeries',
                       params.PointerParam,
+                      condition="not doContinue",
                       pointerClass='SetOfCTFTomoSeries, SetOfTiltSeries',
                       important=True,
                       label='CTF tomo series or tilt-series (aligned)',
-                      help='Set of tilt-series that correspond to subtomograms. '
+                      help='Set of tilt-series that correspond to the input above. '
                            'The matching is done using tsId.')
         form.addParam('tomoSize', params.IntParam,
                       default=800, label='Tomogram thickness (px)',
@@ -85,7 +93,7 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
                            'voxels. Pixel size will be the same as input '
                            'tilt series.')
         form.addParam('numberOfIters', params.IntParam,
-                      label='Iterations', default=5,
+                      label='Iterations', default=3,
                       help="Number of iterations to run.")
         form.addParam('sym', params.StringParam,
                       default='c1',
@@ -98,35 +106,44 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
                       label="CTF correction method (aligner)")
 
         form.addSection(label='References')
+        form.addParam('contMsg', params.LabelParam,
+                      condition="doContinue",
+                      label="In continue mode these options are not available.")
         form.addParam('generateRefs', params.BooleanParam,
+                      condition="not doContinue",
                       default=False, label='Generate reference(s) and mask(s)',
                       help="Generate a sphere template(s) based on radius provided.")
         form.addParam('nref', params.IntParam, label='Number of references for MRA',
-                      default=1, condition="generateRefs")
+                      default=1, condition="generateRefs and not doContinue")
         form.addParam('refRadius', params.StringParam, default='',
-                      condition="generateRefs",
+                      condition="generateRefs and not doContinue",
                       label="Radii for generated template(s)",
                       help="Input values separated by a space.")
         form.addParam('maskRadius', params.StringParam, default='',
-                      condition="generateRefs",
+                      condition="generateRefs and not doContinue",
                       label="Radii for generated mask(s)",
                       help="Input values separated by a space. Values bigger "
                            "than reference radii are expected.")
 
-        form.addParam('inputRefs', params.MultiPointerParam,
-                      pointerClass='Volume',
+        form.addParam('inputRefs', params.PointerParam,
+                      pointerClass='AverageSubTomogram, SetOfAverageSubTomograms,'
+                                   'Volume, SetOfVolumes',
                       allowsNull=True,
                       label="Input reference(s)",
-                      condition="not generateRefs")
-        form.addParam('inputMasks', params.MultiPointerParam,
-                      condition="not generateRefs",
+                      condition="not generateRefs and not doContinue")
+        form.addParam('inputMasks', params.PointerParam,
+                      condition="not generateRefs and not doContinue",
                       label="Alignment mask(s)",
-                      pointerClass='VolumeMask',
+                      pointerClass='VolumeMask, SetOfVolumes',
                       allowsNull=True,
                       help='Need to have the same dimensions as the template. '
                            'Masks order should match the references.')
 
         form.addSection(label='Angular scanning')
+        form.addParam('randomizeAngles', params.BooleanParam,
+                      label='Rotate subtomograms randomly at the start?',
+                      condition="not doContinue",
+                      default=False)
         form.addParam('coneRange', params.IntParam, label='Cone range', default=360,
                       help="The first two Euler angles are used to define the orientation of the vertical axis of the "
                            "protein. First Euler angle (tdrot) rotates the template around its z axis. Second Euler "
@@ -202,26 +219,46 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
-        self._insertFunctionStep(self.convertInputStep)
+        if self.doContinue:
+            self._insertFunctionStep(self.continueStep)
+        else:
+            self._insertFunctionStep(self.convertInputStep)
         self._insertFunctionStep(self.mraStep)
         self._insertFunctionStep(self.createOutputStep)
 
     # --------------------------- STEPS functions -----------------------------
+    def continueStep(self):
+        """ Copy project from the previous run. """
+        mraDir = self._getExtraPath("mra")
+        pwutils.makePath(mraDir)
+        prevRun = self.previousRun.get()
+        prevProj = prevRun._getExtraPath("mra")
+
+        pwutils.copyTree(prevProj, mraDir)
+        pwutils.copyPattern(prevRun._getExtraPath("input_tomos.tomostxt"),
+                            self._getExtraPath())
+
     def convertInputStep(self):
         """ Prepare input files. """
-        inputSubTomos = self.inputSetOfSubTomograms.get()
+        inputCoords = self.inputSetOfCoords3D.get()
         fnTable = self._getTmpPath("input_particles.tbl")
         factor = self.getScaleFactor()
-        with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputSubTomos, scaleFactor=factor)
+        if abs(factor - 1.0 > 0.00001):
+            self.info(f"Scaling coordinates by a factor of {factor:0.2f}")
 
         tsSet = self._getInputTs()
         tsIds_from_ts = set(item.getTsId() for item in tsSet)
-        tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
-        if not tsIds_from_ts.issubset(tsIds_from_subtomos):
-            self.warning("Found subtomos with tsId that did not match "
+        tsIds_from_coords = set(inputCoords.getPrecedentsInvolved().keys())
+        if not tsIds_from_ts.issubset(tsIds_from_coords):
+            self.warning("Found coords with tsId that did not match "
                          "provided tilt-series: "
-                         f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
+                         f"{set.difference(tsIds_from_coords, tsIds_from_ts)}")
+
+        angleMax = tsSet.getAcquisition().getAngleMax() or 0
+        angleMin = tsSet.getAcquisition().getAngleMin() or 0
+
+        with open(fnTable, 'w') as fn:
+            writeDynTable(fn, inputCoords, angleMin, angleMax, scaleFactor=factor)
 
         if self.doCtf():
             # generate defocus files
@@ -236,10 +273,12 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
             self.refs = self.refRadius.get().split()
             self.masks = self.maskRadius.get().split()
         else:
-            self.refs = [i.getFileName() for i in self.inputRefs.get()]
-            self.masks = [i.getFileName() for i in self.inputMasks.get()]
-
-        self.stacks, self.tilts, self.ids = [], [], []
+            if self.isSingleObject(self.inputRefs.get()):
+                self.refs = [os.path.abspath(self.inputRefs.get().getFileName())]
+                self.masks = [os.path.abspath(self.inputMasks.get().getFileName())]
+            else:
+                self.refs = [os.path.abspath(i.getFileName()) for i in self.inputRefs.get()]
+                self.masks = [os.path.abspath(i.getFileName()) for i in self.inputMasks.get()]
 
         for ts in tsSet:
             tsId = ts.getTsId()
@@ -257,8 +296,8 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
                 ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
 
             ts.generateTltFile(tiltFn)
-            self.stacks.append(tsFn)
-            self.tilts.append(tiltFn)
+            self.stacks.append(os.path.abspath(tsFn))
+            self.tilts.append(os.path.abspath(tiltFn))
             self.ids.append(ts.getObjId())
 
     def mraStep(self):
@@ -266,7 +305,8 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
         tsSet = self._getInputTs()
         tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
 
-        params = {
+        self.params = {
+            'continue': bool(self.doContinue),
             'ts_nums': self.ids,
             'refs_nums': self.nref.get() if self.generateRefs else len(self.refs),
             'generate_refs': bool(self.generateRefs),
@@ -299,28 +339,44 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
             'inc_lowpass': bool(self.incLowpass),
             'angles': [self.coneRange.get(), self.coneSampling.get(),
                        self.inplaneRange.get(), self.inplaneSampling.get()],
-            'offsets': [self.offsetRange.get(), self.offsetStep.get()]
+            'offsets': [self.offsetRange.get(), self.offsetStep.get()],
+            'randomize': bool(self.randomizeAngles)
         }
 
         jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
-            json.dump(params, fn, indent=4)
+            json.dump(self.params, fn, indent=4)
 
-        self.runJob(Plugin.getProgram("mra.py"), jsonFn,
-                    env=Plugin.getEnviron())
+        self.runJob(Plugin.getProgram("mra.py"), jsonFn, env=Plugin.getEnviron())
 
     def createOutputStep(self):
         imgSet = self._getInputTs()
+        pixSize = imgSet.getSamplingRate()
+        nRefs = self.params['refs_nums']
         volume = AverageSubTomogram()
-        volumeFile = self._getExtraPath("average_class001.mrc")
-        volume.setFileName(volumeFile)
-        volume.setSamplingRate(imgSet.getSamplingRate())
-        if self.doHalfSets:
-            volume.setHalfMaps([self._getExtraPath("average_class001_half1.mrc"),
-                                self._getExtraPath("average_class001_half2.mrc")])
 
-        self._defineOutputs(**{outputs.outputAverage.name: volume})
-        self._defineSourceRelation(self.inputSetOfSubTomograms, volume)
+        def _createVolume(ind):
+            volumeFile = self._getExtraPath(f"average_class{ind:03d}.mrc")
+            volume.setObjId(None)
+            volume.setFileName(volumeFile)
+            volume.setSamplingRate(pixSize)
+            if self.doHalfSets:
+                volume.setHalfMaps([self._getExtraPath(f"average_class{ind:03d}_half1.mrc"),
+                                    self._getExtraPath(f"average_class{ind:03d}_half2.mrc")])
+            return volume
+
+        if nRefs > 1:
+            volumes = self._createSetOfAverageSubTomograms()
+            volumes.setSamplingRate(pixSize)
+            for i in range(nRefs):
+                volume = _createVolume(i+1)
+                volumes.append(volume)
+        else:
+            volumes = _createVolume(1)
+
+        postfix = "s" if nRefs > 1 else ""
+        self._defineOutputs(**{f"outputAverage{postfix}": volumes})
+        self._defineSourceRelation(self._getInputTs(pointer=True), volumes)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -331,6 +387,16 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
             errors.append("CTF correction requires that you provide "
                           "CTFTomoSeries as input")
 
+        if self.numberOfIters.get() == 1 and self.incLowpass:
+            errors.append("You cannot increase lowpass when doing only 1 iteration.")
+
+        if (self.isSingleObject(self.inputRefs.get()) and
+                not self.isSingleObject(self.inputMasks.get())):
+            errors.append("Number of references and masks must be the same.")
+
+        if self.doContinue and not self.previousRun.hasValue():
+            errors.append("Please input the previous protocol run.")
+
         return errors
 
     # --------------------------- UTILS functions -----------------------------
@@ -340,9 +406,13 @@ class ProtSusanMRA(ProtTomoSubtomogramAveraging):
         return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
     def getScaleFactor(self):
-        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
+        samplingRateCoords = self.inputSetOfCoords3D.get().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
-        return float(samplingRateSubtomos / samplingRateTS)
+        return samplingRateCoords / samplingRateTS
 
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
+
+    def isSingleObject(self, obj):
+        return (isinstance(obj, Volume) or isinstance(obj, AverageSubTomogram) or
+                isinstance(obj, VolumeMask))

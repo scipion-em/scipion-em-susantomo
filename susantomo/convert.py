@@ -27,7 +27,6 @@
 # **************************************************************************
 
 import os
-import math
 import numpy as np
 import logging
 logger = logging.getLogger(__name__)
@@ -77,66 +76,13 @@ def readCtfModelStack(ctfModel, ctfArray, item=0):
         ctfModel.setPhaseShift(ctfPhaseShift)
 
 
-def writeDynTable(fhTable, setOfSubtomograms, scaleFactor=1.0):
-    first = setOfSubtomograms.getFirstItem()
-    hasCoord = first.hasCoordinate3D()
-    hasTransform = first.hasTransform()
-    hasAcquisition = setOfSubtomograms.hasAcquisition()
-    if hasAcquisition:
-        acq = setOfSubtomograms.getAcquisition()
-
-    for subtomo in setOfSubtomograms.iterSubtomos():
-        if hasCoord:
-            coord = subtomo.getCoordinate3D()
-            coord.scale(scaleFactor)
-            x, y, z = coord.getPosition(const.BOTTOM_LEFT_CORNER)
-            tomo_id = coord.getVolId()
-        else:
-            x = 0
-            y = 0
-            z = 0
-            tomo_id = 0
-        if hasTransform:
-            tdrot, tilt, narot, shiftx, shifty, shiftz = matrix2eulerAngles(subtomo.getTransform().getMatrix())
-            shiftx *= scaleFactor
-            shifty *= scaleFactor
-            shiftz *= scaleFactor
-        else:
-            tilt = 0
-            narot = 0
-            tdrot = 0
-            shiftx = 0
-            shifty = 0
-            shiftz = 0
-        if hasAcquisition:
-            anglemin = acq.getAngleMin()
-            anglemax = acq.getAngleMax()
-        else:
-            anglemin = 0
-            anglemax = 0
-        fhTable.write(f'{subtomo.getObjId()} 1 1 {shiftx} {shifty} {shiftz} '
-                      f'{tdrot} {tilt} {narot} 0 0 0 1 {anglemin} {anglemax} '
-                      f'0 0 0 0 {tomo_id} 0 1 0 {x} {y} {z} 0 0 0 0 '
-                      f'0 1 0 0 0 0 0 0 0 0\n')
-
-
-# matrix2euler dynamo
-def matrix2eulerAngles(A):
-    tol = 1e-4
-    if abs(A[2, 2] - 1) < tol:
-        tilt = 0
-        narot = math.atan2(A[1, 0], A[0, 0]) * 180 / math.pi
-        tdrot = 0
-    elif abs(A[2, 2] + 1) < tol:
-        tdrot = 0
-        tilt = 180
-        narot = math.atan2(A[1, 0], A[0, 0]) * 180 / math.pi
-    else:
-        tdrot = math.atan2(A[2, 0], A[2, 1])
-        tilt = math.acos(A[2, 2])
-        narot = math.atan2(A[0, 2], -A[1, 2])
-    tilt = tilt * 180 / math.pi
-    narot = narot * 180 / math.pi
-    tdrot = tdrot * 180 / math.pi
-
-    return tdrot, tilt, narot, A[0, 3], A[1, 3], A[2, 3]
+def writeDynTable(fn, setOfCoordinates3D, angleMin=0, angleMax=0, scaleFactor=1.0):
+    """ Write a Dynamo-style tbl from a set of 3D coordinates. """
+    for coord in setOfCoordinates3D.iterCoordinates():
+        coord.scale(scaleFactor)
+        x, y, z = coord.getPosition(const.BOTTOM_LEFT_CORNER)
+        tomo_id = coord.getVolId()
+        fn.write(f'{coord.getObjId()} 1 1 0 0 0 '
+                 f'0 0 0 0 0 0 1 {angleMin} {angleMax} '
+                 f'0 0 0 0 {tomo_id} 0 1 0 {x} {y} {z} 0 0 0 0 '
+                 f'0 1 0 0 0 0 0 0 0 0\n')

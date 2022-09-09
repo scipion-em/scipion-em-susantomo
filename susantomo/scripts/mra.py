@@ -34,6 +34,8 @@ import os
 import sys
 import json
 import numpy as np
+from glob import glob
+import re
 
 import susan as SUSAN
 
@@ -65,7 +67,15 @@ def createPtclsFile(params, output_dir):
     ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
                                              position=parts[23:26, :].transpose(),
                                              ptcls_id=parts[0],
-                                             tomos_id=parts[19])
+                                             tomos_id=parts[19],
+                                             randomize_angles=params['randomize'])
+
+    # Duplicate references
+    n_refs = params['refs_nums']
+    if n_refs > 1:
+        for i in range(1, n_refs):
+            SUSAN.data.Particles.MRA.duplicate(ptcls, 0)
+
     ptcls.save(os.path.join(output_dir, 'input_particles.ptclsraw'))
 
 
@@ -73,36 +83,52 @@ def createRefsFile(params, output_dir):
     """ Create refstxt file. """
     n_refs = params['refs_nums']
     refs = SUSAN.data.Reference(n_refs=n_refs)
+    prev_cwd = os.getcwd()
+    os.chdir(os.path.join(output_dir))
 
     if params['generate_refs']:
         for i in range(n_refs):
             SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
                 int(params['inputRefs'][i]),  # radius
                 params['box_size']),
-                os.path.join(params['output_dir'], f'../tmp/ref{i+1}.mrc'),
+                f'../tmp/ref{i+1}.mrc',
                 params['pix_size'])
-            refs.ref[i] = os.path.join(params['output_dir'], f'../tmp/ref{i+1}.mrc')
+            refs.ref[i] = os.path.join(os.getcwd(), f'../tmp/ref{i+1}.mrc')
 
             SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
                 int(params['inputMasks'][i]),  # radius
                 params['box_size']),
-                os.path.join(params['output_dir'], f'../tmp/mask{i+1}.mrc'),
+                f'../tmp/mask{i+1}.mrc',
                 params['pix_size'])
-            refs.msk[i] = os.path.join(params['output_dir'], f'../tmp/mask{i+1}.mrc')
+            refs.msk[i] = os.path.join(os.getcwd(), f'../tmp/mask{i+1}.mrc')
     else:
         for i in range(n_refs):
             refs.ref[i] = params['inputRefs'][i]
             refs.msk[i] = params['inputMasks'][i]
 
-    refs.save(os.path.join(output_dir, "input_refs.refstxt"))
+    refs.save("input_refs.refstxt")
+    os.chdir(prev_cwd)
 
 
-def runAlignment(params, output_dir):
-    """ Execute MRA project. """
-    mngr = SUSAN.project.Manager(os.path.join(output_dir, 'mra'), box_size=params['box_size'])
-    mngr.initial_reference = os.path.join(output_dir, "input_refs.refstxt")
-    mngr.initial_particles = os.path.join(output_dir, "input_particles.ptclsraw")
-    mngr.tomogram_file = os.path.join(output_dir, "input_tomos.tomostxt")
+def runAlignment(params, output_dir, doContinue=False):
+    """ Execute MRA project in the output_dir folder. """
+    prev_cwd = os.getcwd()
+    os.chdir(os.path.join(output_dir))
+    if doContinue:
+        mngr = SUSAN.project.Manager('mra')  # only accepts a name, not a path
+        lastIter = _getIterNumber('mra/ite_*') + 1
+        if lastIter is None:
+            raise Exception("Could not find last iteration number")
+        mngr.initial_reference = f"mra/ite_{lastIter:04d}/reference.refstxt"
+        mngr.initial_particles = f"mra/ite_{lastIter:04d}/particles.ptclsraw"
+        mngr.tomogram_file = "input_tomos.tomostxt"
+    else:
+        lastIter = 1
+        mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
+        mngr.initial_reference = "input_refs.refstxt"
+        mngr.initial_particles = "input_particles.ptclsraw"
+        mngr.tomogram_file = "input_tomos.tomostxt"
+
     mngr.list_gpus_ids = list(params['gpus'])
     mngr.threads_per_gpu = params['thr_per_gpu']
     mngr.aligner.ctf_correction = params['ctf_corr_aln']
@@ -120,15 +146,20 @@ def runAlignment(params, output_dir):
 
     inc_lp = params['inc_lowpass']
     lp = params['low']
+    n_refs = params['refs_nums']
 
-    for i in range(1, params['iter'] + 1):
+    for i in range(lastIter, params['iter'] + 1):
         mngr.aligner.bandpass.lowpass = lp
         bp = mngr.execute_iteration(i)
+        if n_refs > 1:
+            bp = max(max(bp), 1.0)  # avoid 0.0
         if i == 1 or not inc_lp:
             lp = bp
         else:
             # Enforce a gradual increase in the lowpass
             lp = min(lp + 2, bp)
+
+    os.chdir(prev_cwd)
 
 
 def reconstructAvg(params, output_dir):
@@ -146,6 +177,18 @@ def reconstructAvg(params, output_dir):
                      box_size=params['box_size'])
 
 
+def _getIterNumber(path):
+    """ Return the last iteration number. """
+    result = None
+    files = sorted(glob(path))
+    if files:
+        f = files[-1]
+        s = re.compile('ite_(\d{4})').search(f)
+        if s:
+            result = int(s.group(1))  # group 1 is 1 digit iteration number
+    return result
+
+
 if __name__ == '__main__':
     if len(sys.argv) > 0:
         inputJson = sys.argv[1]
@@ -155,10 +198,11 @@ if __name__ == '__main__':
                 params = json.load(fn)
                 output_dir = params['output_dir']
 
-            createTomosFile(params, output_dir)
-            createPtclsFile(params, output_dir)
-            createRefsFile(params, output_dir)
-            runAlignment(params, output_dir)
+            if not params['continue']:
+                createTomosFile(params, output_dir)
+                createPtclsFile(params, output_dir)
+                createRefsFile(params, output_dir)
+            runAlignment(params, output_dir, doContinue=params['continue'])
             reconstructAvg(params, output_dir)
         else:
             raise FileNotFoundError(inputJson)
