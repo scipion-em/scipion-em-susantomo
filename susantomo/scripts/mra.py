@@ -47,13 +47,13 @@ def runAlignment(params, doContinue=False):
             raise Exception("Could not find last iteration number")
         mngr.initial_reference = f"mra/ite_{lastIter:04d}/reference.refstxt"
         mngr.initial_particles = f"mra/ite_{lastIter:04d}/particles.ptclsraw"
-        mngr.tomogram_file = "input_tomos.tomostxt"
     else:
         lastIter = 1
         mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
-        mngr.initial_reference = "input_refs.refstxt"
-        mngr.initial_particles = "input_particles.ptclsraw"
-        mngr.tomogram_file = "input_tomos.tomostxt"
+        mngr.initial_reference = "input/input_refs.refstxt"
+        mngr.initial_particles = "input/input_particles.ptclsraw"
+
+    mngr.tomogram_file = "input/input_tomos.tomostxt"
 
     mngr.list_gpus_ids = list(params['gpus'])
     mngr.threads_per_gpu = params['thr_per_gpu']
@@ -74,7 +74,7 @@ def runAlignment(params, doContinue=False):
     lp = params['low']
     n_refs = params['refs_nums']
 
-    for i in range(lastIter, params['iter'] + 1):
+    for i in range(lastIter, lastIter + params['iter'] + 1):
         mngr.aligner.bandpass.lowpass = lp
         bp = mngr.execute_iteration(i)
         if n_refs > 1:
@@ -96,7 +96,7 @@ def reconstructAvg(params):
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
     lastIter = getIterNumber('mra/ite_*')
-    avgr.reconstruct("average", "input_tomos.tomostxt",
+    avgr.reconstruct("average", "input/input_tomos.tomostxt",
                      f"mra/ite_{lastIter:04d}/particles.ptclsraw",
                      box_size=params['box_size'])
 

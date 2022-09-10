@@ -157,7 +157,7 @@ class ProtSusanBase(EMProtocol):
         with open(fnTable, 'w') as fn:
             writeDynTable(fn, inputCoords, angleMin, angleMax, scaleFactor=factor)
 
-        if self.doCtf():
+        if self.hasCtf():
             # generate defocus files
             setOfCtfTomoSeries = self.inputTiltSeries.get()
             imodUtils = Domain.importFromPlugin('imod.utils')
@@ -186,6 +186,7 @@ class ProtSusanBase(EMProtocol):
             self.tilts.append(os.path.abspath(tiltFn))
             self.ids.append(ts.getObjId())
 
+        pwutils.makePath(self._getExtraPath("input"))
         self.convertInputRefs()
 
     # --------------------------- INFO functions ------------------------------
@@ -212,9 +213,9 @@ class ProtSusanBase(EMProtocol):
         samplingRateTS = self._getInputTs().getSamplingRate()
         return samplingRateCoords / samplingRateTS
 
-    def doCtf(self):
+    def hasCtf(self):
         """ Should be re-defined in subclasses. """
-        return False
+        return isinstance(self.inputTiltSeries.get(), SetOfCTFTomoSeries)
 
     def isContinue(self):
         """ Should be re-defined in subclasses. """

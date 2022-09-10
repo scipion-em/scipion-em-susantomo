@@ -73,7 +73,7 @@ Protocols
 
 * ctf estimation
 * multi-reference alignment
-* average and reconstruct 3D
+* average and reconstruct
 
 References
 -----------

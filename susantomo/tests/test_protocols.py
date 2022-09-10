@@ -30,7 +30,7 @@ from pyworkflow.utils import magentaStr
 
 from tomo.protocols import ProtImportTs, ProtImportCoordinates3D
 from imod.protocols import ProtImodImportSetOfCtfTomoSeries, ProtImodTomoReconstruction
-from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA
+from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA, ProtSusanAverage
 
 
 class TestBase(BaseTest):
@@ -118,14 +118,21 @@ class TestSusanMRA(TestBase):
                                                    boxSize=32,
                                                    importTomograms=protRecon.outputSetOfTomograms)
 
+        print(magentaStr("\n==> Testing susan - average and reconstruct:"))
+        cls.protAvg = ProtSusanAverage(tomoSize=110, boxSize=32)
+        cls.protAvg.inputSetOfCoords3D.set(cls.protImportCoords.outputCoordinates)
+        cls.protAvg.inputTiltSeries.set(cls.protImportCtf.outputSetOfCTFTomoSeries)
+        cls.launchProtocol(cls.protAvg)
+        cls.assertIsNotNone(cls.protAvg.outputAverage, "AverageSubTomogram has not been produced.")
+
     def testMRA(self):
         print(magentaStr("\n==> Testing susan - multi-reference alignment:"))
         protMRA = ProtSusanMRA(tomoSize=110, boxSize=32, numberOfIters=2,
-                               generateRefs=True, refRadius="4 4", maskRadius="5 5",
                                coneRange=0, coneSampling=1, inplaneRange=0, inplaneSampling=1,
-                               refine=2, refineFactor=1, allowDrift=True, nref=2)
+                               refine=2, refineFactor=1, allowDrift=True)
         protMRA.inputSetOfCoords3D.set(self.protImportCoords.outputCoordinates)
         protMRA.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
+        protMRA.inputRefs.set(self.protAvg.outputAverage)
+        protMRA.inputMasks.set(self.protAvg.outputAverage)
         self.launchProtocol(protMRA)
-
-        self.assertIsNotNone(protMRA.outputAverages, "SetOfAverageSubtomograms has not been produced.")
+        self.assertIsNotNone(protMRA.outputAverage, "AverageSubtomogram has not been produced.")

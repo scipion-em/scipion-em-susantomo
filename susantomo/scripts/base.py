@@ -43,8 +43,6 @@ def createTomosFile(params):
     n_tomo = len(params['ts_nums'])
     tomos = SUSAN.data.Tomograms(n_tomo=n_tomo,
                                  n_proj=params['num_tilts'])
-    has_ctf = params.get("ctf_corr", False)
-
     for i in range(n_tomo):
         tomos.tomo_id[i] = params['ts_nums'][i]
         tomos.set_stack(i, params['inputStacks'][i])
@@ -54,13 +52,13 @@ def createTomosFile(params):
         tomos.voltage[i] = params['voltage']
         tomos.amp_cont[i] = params['amp_cont']
         tomos.sph_aber[i] = params['sph_aber']
-        if has_ctf and params['ctf_corr'] != 'none':
+        if params['has_ctf']:
             tomos.set_defocus(i, params['inputAngles'][i].replace(".tlt", ".defocus"))
 
     if n_tomo == 1:
         output = f"tomo{params['ts_nums'][0]}.tomostxt"
     else:
-        output = "input_tomos.tomostxt"
+        output = "input/input_tomos.tomostxt"
 
     tomos.save(output)
 
@@ -68,7 +66,7 @@ def createTomosFile(params):
 def createPtclsFile(params, n_refs):
     """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
     parts = np.loadtxt("../tmp/input_particles.tbl", unpack=True)
-    tomos = SUSAN.read("input_tomos.tomostxt")
+    tomos = SUSAN.read("input/input_tomos.tomostxt")
     randomize = params.get("randomize", False)
     ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
                                              position=parts[23:26, :].transpose(),
@@ -80,34 +78,28 @@ def createPtclsFile(params, n_refs):
         for _ in range(n_refs-1):
             SUSAN.data.Particles.MRA.duplicate(ptcls, 0)
 
-    ptcls.save("input_particles.ptclsraw")
+    ptcls.save("input/input_particles.ptclsraw")
 
 
 def createRefsFile(params, n_refs):
     """ Create refstxt file. """
     refs = SUSAN.data.Reference(n_refs=n_refs)
 
-    if params['generate_refs']:
-        for i in range(n_refs):
-            SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
-                int(params['inputRefs'][i]),  # radius
-                params['box_size']),
-                f'../tmp/ref{i+1}.mrc',
-                params['pix_size'])
-            refs.ref[i] = os.path.join(os.getcwd(), f'../tmp/ref{i+1}.mrc')
+    for i in range(n_refs):
+        refs.ref[i] = params['inputRefs'][i]
+        refs.msk[i] = params['inputMasks'][i]
 
-            SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
-                int(params['inputMasks'][i]),  # radius
-                params['box_size']),
-                f'../tmp/mask{i+1}.mrc',
-                params['pix_size'])
-            refs.msk[i] = os.path.join(os.getcwd(), f'../tmp/mask{i+1}.mrc')
-    else:
-        for i in range(n_refs):
-            refs.ref[i] = params['inputRefs'][i]
-            refs.msk[i] = params['inputMasks'][i]
+    refs.save("input/input_refs.refstxt")
 
-    refs.save("input_refs.refstxt")
+
+def generateRefs(params):
+    SUSAN.io.mrc.write(
+        SUSAN.utils.create_sphere(params['ref_size'], params['box_size']),
+        'reference.mrc', params['pix_size'])
+
+    SUSAN.io.mrc.write(
+        SUSAN.utils.create_sphere(params['mask_size'], params['box_size']),
+        'mask.mrc', params['pix_size'])
 
 
 def getIterNumber(path):

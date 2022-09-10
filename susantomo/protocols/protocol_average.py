@@ -67,7 +67,6 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'ts_nums': self.ids,
             'inputStacks': self.stacks,
             'inputAngles': self.tilts,
-            'output_dir': self._getExtraPath(),
             'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
             'pix_size': tsSet.getSamplingRate(),
             'tomo_size': tomo_size,
@@ -77,7 +76,8 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'sph_aber': tsSet.getAcquisition().getSphericalAberration(),
             'amp_cont': tsSet.getAcquisition().getAmplitudeContrast(),
             'thr_per_gpu': self.numberOfThreads.get(),
-            'ctf_corr': self.getEnumText('ctfCorrAvg'),
+            'has_ctf': self.hasCtf(),
+            'ctf_corr_avg': self.getEnumText('ctfCorrAvg'),
             'do_halfsets': self.doHalfSets.get(),
             'symmetry': self.sym.get(),
             'padding': self.getEnumText('padding')
@@ -109,13 +109,19 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def _validate(self):
         errors = []
 
-        if self.doCtf() and isinstance(self.inputTiltSeries.get(),
-                                       SetOfTiltSeries):
+        if self.ctfCorrAvg.get() and isinstance(self.inputTiltSeries.get(),
+                                                SetOfTiltSeries):
             errors.append("CTF correction requires that you provide "
                           "CTFTomoSeries as input")
 
         return errors
 
+    def _summary(self):
+        summary = []
+
+        if hasattr(self, outputs.outputAverage.name):
+            summary.append("Computed a 3D average using input coordinates.")
+        else:
+            summary.append("Output is not ready")
+
     # --------------------------- UTILS functions -----------------------------
-    def doCtf(self):
-        return self.ctfCorrAvg.get()
