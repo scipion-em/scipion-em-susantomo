@@ -30,46 +30,15 @@ This script should be launched using the SUSAN python interpreter
 inside its conda environment.
 """
 
-import os
 import sys
 import json
-import numpy as np
 
 import susan as SUSAN
 
-
-def createTomosFile(params, output_dir):
-    """ Create tomostxt file. """
-    n_tomo = len(params['ts_nums'])
-    tomos = SUSAN.data.Tomograms(n_tomo=n_tomo,
-                                 n_proj=params['num_tilts'])
-    for i in range(n_tomo):
-        tomos.tomo_id[i] = params['ts_nums'][i]
-        tomos.set_stack(i, params['inputStacks'][i])
-        tomos.set_angles(i, params['inputAngles'][i])
-        tomos.pix_size[i] = params['pix_size']
-        tomos.tomo_size[i] = tuple(params['tomo_size'])
-        tomos.voltage[i] = params['voltage']
-        tomos.amp_cont[i] = params['amp_cont']
-        tomos.sph_aber[i] = params['sph_aber']
-        if params['ctf_corr'] != 'none':
-            tomos.set_defocus(i, params['inputAngles'][i].replace(".tlt", ".defocus"))
-
-    tomos.save(os.path.join(output_dir, "input_tomos.tomostxt"))
+from base import *
 
 
-def createPtclsFile(params, output_dir):
-    """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
-    parts = np.loadtxt(os.path.join(params['output_dir'], '../tmp/input_particles.tbl'), unpack=True)
-    tomos = SUSAN.read(os.path.join(params['output_dir'], "input_tomos.tomostxt"))
-    ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
-                                             position=parts[23:26, :].transpose(),
-                                             ptcls_id=parts[0],
-                                             tomos_id=parts[19])
-    ptcls.save(os.path.join(output_dir, 'input_particles.ptclsraw'))
-
-
-def reconstructAvg(params, output_dir):
+def reconstructAvg(params):
     """ Reconstruct an average 3D volume. """
     avgr = SUSAN.modules.Averager()
     avgr.list_gpus_ids = list(params['gpus'])
@@ -78,9 +47,8 @@ def reconstructAvg(params, output_dir):
     avgr.rec_halfsets = bool(params['do_halfsets'])
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
-    avgr.reconstruct(os.path.join(output_dir, "average"),
-                     os.path.join(output_dir, "input_tomos.tomostxt"),
-                     os.path.join(output_dir, "input_particles.ptclsraw"),
+    avgr.reconstruct("average", "input_tomos.tomostxt",
+                     "input_particles.ptclsraw",
                      box_size=params['box_size'])
 
 
@@ -91,11 +59,10 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                output_dir = params['output_dir']
 
-            createTomosFile(params, output_dir)
-            createPtclsFile(params, output_dir)
-            reconstructAvg(params, output_dir)
+            createTomosFile(params)
+            createPtclsFile(params, n_refs=1)
+            reconstructAvg(params)
         else:
             raise FileNotFoundError(inputJson)
     else:

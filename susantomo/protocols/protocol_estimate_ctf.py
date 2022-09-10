@@ -128,11 +128,10 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         ts_num = ts.getObjId()
 
         params = {
-            'ts_num': ts_num,
-            'inputStack': tsFn,
-            'inputAngles': tiltFn,
-            'output_dir': extraPrefix,
-            'num_tilts': self._getInputTs().getAnglesCount(),
+            'ts_nums': [ts_num],
+            'inputStacks': [os.path.abspath(tsFn)],
+            'inputAngles': [os.path.abspath(tiltFn)],
+            'num_tilts': ts.getSize(),
             'pix_size': ts.getSamplingRate(),
             'tomo_size': tomo_size,
             'sampling': self.gridSampling.get(),
@@ -154,8 +153,11 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             json.dump(params, fn, indent=4)
 
         try:
-            self.runJob(Plugin.getProgram("estimate_ctf.py"), jsonFn,
-                        env=Plugin.getEnviron(), numberOfThreads=1)
+            self.runJob(Plugin.getProgram("estimate_ctf.py"),
+                        os.path.abspath(jsonFn),
+                        env=Plugin.getEnviron(),
+                        cwd=extraPrefix,
+                        numberOfThreads=1)
 
             outputLog = self.getOutputPath(tsId, ts_num) + "/defocus.txt"
             ctfResult = parseImodCtf(outputLog)

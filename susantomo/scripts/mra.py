@@ -30,93 +30,19 @@ This script should be launched using the SUSAN python interpreter
 inside its conda environment.
 """
 
-import os
 import sys
 import json
-import numpy as np
-from glob import glob
-import re
 
 import susan as SUSAN
 
-
-def createTomosFile(params, output_dir):
-    """ Create tomostxt file. """
-    n_tomo = len(params['ts_nums'])
-    tomos = SUSAN.data.Tomograms(n_tomo=n_tomo,
-                                 n_proj=params['num_tilts'])
-    for i in range(n_tomo):
-        tomos.tomo_id[i] = params['ts_nums'][i]
-        tomos.set_stack(i, params['inputStacks'][i])
-        tomos.set_angles(i, params['inputAngles'][i])
-        tomos.pix_size[i] = params['pix_size']
-        tomos.tomo_size[i] = tuple(params['tomo_size'])
-        tomos.voltage[i] = params['voltage']
-        tomos.amp_cont[i] = params['amp_cont']
-        tomos.sph_aber[i] = params['sph_aber']
-        if params['ctf_corr_aln'] != 'none':
-            tomos.set_defocus(i, params['inputAngles'][i].replace(".tlt", ".defocus"))
-
-    tomos.save(os.path.join(output_dir, "input_tomos.tomostxt"))
+from base import *
 
 
-def createPtclsFile(params, output_dir):
-    """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
-    parts = np.loadtxt(os.path.join(params['output_dir'], '../tmp/input_particles.tbl'), unpack=True)
-    tomos = SUSAN.read(os.path.join(params['output_dir'], "input_tomos.tomostxt"))
-    ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
-                                             position=parts[23:26, :].transpose(),
-                                             ptcls_id=parts[0],
-                                             tomos_id=parts[19],
-                                             randomize_angles=params['randomize'])
-
-    # Duplicate references
-    n_refs = params['refs_nums']
-    if n_refs > 1:
-        for i in range(1, n_refs):
-            SUSAN.data.Particles.MRA.duplicate(ptcls, 0)
-
-    ptcls.save(os.path.join(output_dir, 'input_particles.ptclsraw'))
-
-
-def createRefsFile(params, output_dir):
-    """ Create refstxt file. """
-    n_refs = params['refs_nums']
-    refs = SUSAN.data.Reference(n_refs=n_refs)
-    prev_cwd = os.getcwd()
-    os.chdir(os.path.join(output_dir))
-
-    if params['generate_refs']:
-        for i in range(n_refs):
-            SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
-                int(params['inputRefs'][i]),  # radius
-                params['box_size']),
-                f'../tmp/ref{i+1}.mrc',
-                params['pix_size'])
-            refs.ref[i] = os.path.join(os.getcwd(), f'../tmp/ref{i+1}.mrc')
-
-            SUSAN.io.mrc.write(SUSAN.utils.create_sphere(
-                int(params['inputMasks'][i]),  # radius
-                params['box_size']),
-                f'../tmp/mask{i+1}.mrc',
-                params['pix_size'])
-            refs.msk[i] = os.path.join(os.getcwd(), f'../tmp/mask{i+1}.mrc')
-    else:
-        for i in range(n_refs):
-            refs.ref[i] = params['inputRefs'][i]
-            refs.msk[i] = params['inputMasks'][i]
-
-    refs.save("input_refs.refstxt")
-    os.chdir(prev_cwd)
-
-
-def runAlignment(params, output_dir, doContinue=False):
+def runAlignment(params, doContinue=False):
     """ Execute MRA project in the output_dir folder. """
-    prev_cwd = os.getcwd()
-    os.chdir(os.path.join(output_dir))
     if doContinue:
         mngr = SUSAN.project.Manager('mra')  # only accepts a name, not a path
-        lastIter = _getIterNumber('mra/ite_*') + 1
+        lastIter = getIterNumber('mra/ite_*') + 1
         if lastIter is None:
             raise Exception("Could not find last iteration number")
         mngr.initial_reference = f"mra/ite_{lastIter:04d}/reference.refstxt"
@@ -159,10 +85,8 @@ def runAlignment(params, output_dir, doContinue=False):
             # Enforce a gradual increase in the lowpass
             lp = min(lp + 2, bp)
 
-    os.chdir(prev_cwd)
 
-
-def reconstructAvg(params, output_dir):
+def reconstructAvg(params):
     """ Reconstruct an average 3D volume. """
     avgr = SUSAN.modules.Averager()
     avgr.list_gpus_ids = list(params['gpus'])
@@ -171,22 +95,10 @@ def reconstructAvg(params, output_dir):
     avgr.rec_halfsets = bool(params['do_halfsets'])
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
-    avgr.reconstruct(os.path.join(output_dir, "average"),
-                     os.path.join(output_dir, "input_tomos.tomostxt"),
-                     os.path.join(output_dir, f"mra/ite_{params['iter']:04d}/particles.ptclsraw"),
+    lastIter = getIterNumber('mra/ite_*')
+    avgr.reconstruct("average", "input_tomos.tomostxt",
+                     f"mra/ite_{lastIter:04d}/particles.ptclsraw",
                      box_size=params['box_size'])
-
-
-def _getIterNumber(path):
-    """ Return the last iteration number. """
-    result = None
-    files = sorted(glob(path))
-    if files:
-        f = files[-1]
-        s = re.compile('ite_(\d{4})').search(f)
-        if s:
-            result = int(s.group(1))  # group 1 is 1 digit iteration number
-    return result
 
 
 if __name__ == '__main__':
@@ -196,14 +108,14 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                output_dir = params['output_dir']
 
             if not params['continue']:
-                createTomosFile(params, output_dir)
-                createPtclsFile(params, output_dir)
-                createRefsFile(params, output_dir)
-            runAlignment(params, output_dir, doContinue=params['continue'])
-            reconstructAvg(params, output_dir)
+                createTomosFile(params)
+                createPtclsFile(params, params['refs_nums'])
+                createRefsFile(params, params['refs_nums'])
+
+            runAlignment(params, doContinue=params['continue'])
+            reconstructAvg(params)
         else:
             raise FileNotFoundError(inputJson)
     else:

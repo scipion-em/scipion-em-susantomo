@@ -36,31 +36,17 @@ import json
 
 import susan as SUSAN
 
-
-def createTomoFile(params, ts_id, output_dir):
-    """ Create tomostxt file. """
-    tomos = SUSAN.data.Tomograms(n_tomo=1, n_proj=params['num_tilts'])
-    tomos.tomo_id[0] = ts_id
-    tomos.set_stack(0, params['inputStack'])
-    tomos.set_angles(0, params['inputAngles'])
-    tomos.pix_size[0] = params['pix_size']
-    tomos.tomo_size[0] = tuple(params['tomo_size'])
-    tomos.voltage[0] = params['voltage']
-    tomos.amp_cont[0] = params['amp_cont']
-    tomos.sph_aber[0] = params['sph_aber']
-    #tomos.set_defocus(0, os.path.join(output_dir, f"tomo{ts_id}.defocus"))
-
-    tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
+from base import createTomosFile
 
 
-def create2DGrid(params, ts_id, output_dir):
+def create2DGrid(params, ts_id):
     """ Create a 2D grid to estimate the CTF. """
-    tomos = SUSAN.read(os.path.join(params['output_dir'], f"tomo{ts_id}.tomostxt"))
+    tomos = SUSAN.read(f"tomo{ts_id}.tomostxt")
     grid = SUSAN.data.Particles.grid_2d(tomos, step_pixels=params['sampling'])
-    grid.save(os.path.join(output_dir, "grid_ctf.ptclsraw"))
+    grid.save("grid_ctf.ptclsraw")
 
 
-def estimateCtf(params, ts_id, output_dir):
+def estimateCtf(params, ts_id):
     """ Run CTF estimator. """
     ctf_est = SUSAN.modules.CtfEstimator()
     ctf_est.binning = params['binning']
@@ -70,10 +56,8 @@ def estimateCtf(params, ts_id, output_dir):
     ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
     ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms
     ctf_est.defocus_angstroms.max_val = params['def_max']  # angstroms
-    ctf_est.estimate(os.path.join(output_dir, 'ctf_grid'),
-                     os.path.join(output_dir, f"tomo{ts_id}.tomostxt"),
-                     os.path.join(output_dir, "grid_ctf.ptclsraw"),
-                     params['patch_size'])
+    ctf_est.estimate('ctf_grid', f"tomo{ts_id}.tomostxt",
+                     "grid_ctf.ptclsraw", params['patch_size'])
 
     #tomos = SUSAN.read(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
     #tomos.set_defocus(0, os.path.join(output_dir, f'ctf_grid/Tomo{ts_id:03g}/defocus.txt'))
@@ -87,12 +71,11 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                output_dir = params['output_dir']
-                ts_id = params['ts_num']  # integer
+                ts_id = params['ts_nums'][0]
 
-            createTomoFile(params, ts_id, output_dir)
-            create2DGrid(params, ts_id, output_dir)
-            estimateCtf(params, ts_id, output_dir)
+            createTomosFile(params)
+            create2DGrid(params, ts_id)
+            estimateCtf(params, ts_id)
         else:
             raise FileNotFoundError(inputJson)
     else:
