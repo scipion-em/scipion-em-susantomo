@@ -30,6 +30,7 @@ This script should be launched using the SUSAN python interpreter
 inside its conda environment.
 """
 
+import os
 import sys
 import json
 

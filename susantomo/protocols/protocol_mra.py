@@ -35,7 +35,6 @@ import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
 import pyworkflow.utils as pwutils
 from pwem import emlib
-from pwem.objects import EMSet
 
 from tomo.objects import (SetOfTiltSeries, AverageSubTomogram,
                           SetOfAverageSubTomograms)
@@ -70,20 +69,18 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         form.addParam('contMsg', params.LabelParam,
                       condition="doContinue",
                       label="In continue mode these options are not available.")
-        form.addParam('inputRefs', params.PointerParam,
+        form.addParam('inputRefs', params.MultiPointerParam,
                       important=True,
                       allowsNull=True,
-                      pointerClass='AverageSubTomogram, '
-                                   'SetOfAverageSubTomograms,'
-                                   'Volume, SetOfVolumes',
-                      label="Input reference(s)",
+                      pointerClass='AverageSubTomogram, Volume',
+                      label="Input references",
                       condition="not doContinue")
-        form.addParam('inputMasks', params.PointerParam,
+        form.addParam('inputMasks', params.MultiPointerParam,
                       important=True,
                       allowsNull=True,
                       condition="not doContinue",
-                      label="Alignment mask(s)",
-                      pointerClass='Volume, VolumeMask, SetOfVolumes',
+                      label="Alignment mask",
+                      pointerClass='Volume, VolumeMask',
                       help='Need to have the same dimensions as the template. '
                            'Masks order should match the references.')
 
@@ -193,16 +190,11 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             sys.stdout.write(line)
 
         # count previous refs
-        refs = prevRun.inputRefs.get()
-        self.refs_nums = refs.getSize() if self.isSet(refs) else 1
+        self.refs_nums = len(prevRun.inputRefs)
 
     def convertInputRefs(self):
-        if not self.isSet(self.inputRefs.get()):
-            self.refs.append(os.path.abspath(self.inputRefs.get().getFileName()))
-            self.masks.append(os.path.abspath(self.inputMasks.get().getFileName()))
-        else:
-            self.refs.extend([os.path.abspath(i.getFileName()) for i in self.inputRefs.get()])
-            self.masks.extend([os.path.abspath(i.getFileName()) for i in self.inputMasks.get()])
+        self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
+        self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
 
     def runSusanStep(self):
         """ Run susan_aligner and susan_reconstruct programs. """
@@ -308,14 +300,8 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         if self.numberOfIters.get() == 1 and self.incLowpass:
             errors.append("You cannot increase lowpass when doing only 1 iteration.")
 
-        msg = "Number of references and masks must be the same."
-        if self.isSet(refs.get()) and self.isSet(masks.get()):
-            if refs.get().getSize() != masks.get().getSize():
-                errors.append(msg)
-        elif self.isSet(refs.get()) and not self.isSet(masks.get()):
-            errors.append(msg)
-        elif not self.isSet(refs.get()) and self.isSet(masks.get()):
-            errors.append(msg)
+        if len(refs) != len(masks):
+            errors.append("Number of references and masks must be the same.")
 
         if self.doContinue and not self.previousRun.hasValue():
             errors.append("Please input the previous protocol run.")
@@ -333,6 +319,3 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     def isContinue(self):
         return self.doContinue
-
-    def isSet(self, obj):
-        return isinstance(obj, EMSet)

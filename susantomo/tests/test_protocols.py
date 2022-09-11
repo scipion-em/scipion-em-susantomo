@@ -155,8 +155,8 @@ class TestSusanMRAWorkflow(TestBase):
                                allowDrift=True)
         protMRA.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
         protMRA.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
-        protMRA.inputRefs.set(protAvg.outputAverage)
-        protMRA.inputMasks.set(protAvg.outputAverage)
+        protMRA.inputRefs.set([protAvg.outputAverage])
+        protMRA.inputMasks.set([protAvg.outputAverage])
         self.launchProtocol(protMRA)
         self.assertIsNotNone(protMRA.outputAverage,
                              "AverageSubtomogram has not been produced.")
