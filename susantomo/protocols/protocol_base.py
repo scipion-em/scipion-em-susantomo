@@ -59,13 +59,12 @@ class ProtSusanBase(EMProtocol):
 
         self._defineContinueParams(form)
 
-        form.addParam('inputSetOfCoords3D', params.PointerParam,
-                      pointerClass="SetOfCoordinates3D",
-                      condition="not doContinue",
+        form.addParam('inputSetOfSubTomograms', params.PointerParam,
+                      pointerClass="SetOfSubTomograms",
                       important=True,
-                      label='Input 3D coordinates',
-                      help="Set of 3D coordinates defining "
-                           "subtomograms positions.")
+                      label='Input subtomograms',
+                      help="Set of subtomograms that will be used to fetch "
+                           "alignment and coordinates information.")
         form.addParam('inputTiltSeries',
                       params.PointerParam,
                       condition="not doContinue",
@@ -75,7 +74,7 @@ class ProtSusanBase(EMProtocol):
                       help='Set of tilt-series that correspond to the '
                            'input above. The matching is done using tsId.')
         form.addParam('tomoSize', params.IntParam,
-                      default=800, label='Tomogram thickness (px)',
+                      default=110, label='Tomogram thickness (px)',
                       help='Z height of a tomogram volume in '
                            'pixels. Required for tilt series stack.')
         form.addParam('boxSize', params.IntParam,
@@ -105,7 +104,7 @@ class ProtSusanBase(EMProtocol):
                       expertLevel=params.LEVEL_ADVANCED,
                       choices=['zero', 'noise'], default=1,
                       label="Padding type")
-        form.addParam('doHalfSets', params.BooleanParam, default=False,
+        form.addParam('doHalfSets', params.BooleanParam, default=True,
                       label="Reconstruct half-sets?")
 
         form.addParallelSection(threads=1, mpi=1)
@@ -135,9 +134,13 @@ class ProtSusanBase(EMProtocol):
         self._insertFunctionStep(self.createOutputStep)
 
     # --------------------------- STEPS functions -----------------------------
+    def continueStep(self):
+        """ Should be implemented in sub-classes. """
+        raise NotImplementedError
+
     def convertInputStep(self):
         """ Prepare input files. """
-        inputCoords = self.inputSetOfCoords3D.get()
+        inputSubTomos = self.inputSetOfSubTomograms.get()
         fnTable = self._getTmpPath("input_particles.tbl")
         factor = self.getScaleFactor()
         if abs(factor - 1.0 > 0.00001):
@@ -145,17 +148,17 @@ class ProtSusanBase(EMProtocol):
 
         tsSet = self._getInputTs()
         tsIds_from_ts = set(item.getTsId() for item in tsSet)
-        tsIds_from_coords = set(inputCoords.getPrecedentsInvolved().keys())
-        if not tsIds_from_ts.issubset(tsIds_from_coords):
-            self.warning("Found coords with tsId that did not match "
+        tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
+        if not tsIds_from_ts.issubset(tsIds_from_subtomos):
+            self.warning("Found subtomos with tsId that did not match "
                          "provided tilt-series: "
-                         f"{set.difference(tsIds_from_coords, tsIds_from_ts)}")
+                         f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
 
         angleMax = tsSet.getAcquisition().getAngleMax() or 0
         angleMin = tsSet.getAcquisition().getAngleMin() or 0
 
         with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputCoords, angleMin, angleMax, scaleFactor=factor)
+            writeDynTable(fn, inputSubTomos, angleMin, angleMax, scaleFactor=factor)
 
         if self.hasCtf():
             # generate defocus files
@@ -189,6 +192,14 @@ class ProtSusanBase(EMProtocol):
         pwutils.makePath(self._getExtraPath("input"))
         self.convertInputRefs()
 
+    def runSusanStep(self):
+        """ Should be implemented in sub-classes. """
+        raise NotImplementedError
+
+    def createOutputStep(self):
+        """ Should be implemented in sub-classes. """
+        raise NotImplementedError
+
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
         """ Should be re-defined in subclasses. """
@@ -209,9 +220,9 @@ class ProtSusanBase(EMProtocol):
         return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
     def getScaleFactor(self):
-        samplingRateCoords = self.inputSetOfCoords3D.get().getSamplingRate()
+        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
-        return samplingRateCoords / samplingRateTS
+        return samplingRateSubtomos / samplingRateTS
 
     def hasCtf(self):
         """ Should be re-defined in subclasses. """

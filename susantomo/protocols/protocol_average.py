@@ -120,7 +120,7 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
         summary = []
 
         if hasattr(self, outputs.outputAverage.name):
-            summary.append("Computed a 3D average using input coordinates.")
+            summary.append("Computed a 3D average using input subtomograms.")
         else:
             summary.append("Output is not ready")
 

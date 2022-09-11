@@ -27,10 +27,19 @@
 import os
 from pyworkflow.tests import BaseTest, DataSet, setupTestProject
 from pyworkflow.utils import magentaStr
+from pwem import Domain
 
 from tomo.protocols import ProtImportTs, ProtImportCoordinates3D
 from imod.protocols import ProtImodImportSetOfCtfTomoSeries, ProtImodTomoReconstruction
 from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA, ProtSusanAverage
+
+try:
+    ProtEmanExtractSubtomo = Domain.importFromPlugin("emantomo.protocols",
+                                                     "EmanProtTomoExtraction",
+                                                     doRaise=True)
+except ImportError as e:
+    print("Emantomo plugin not found! You need to install it "
+          "to be able to run this test.")
 
 
 class TestBase(BaseTest):
@@ -38,21 +47,24 @@ class TestBase(BaseTest):
     def runImportTiltSeries(cls, **kwargs):
         cls.protImportTS = cls.newProtocol(ProtImportTs, **kwargs)
         cls.launchProtocol(cls.protImportTS)
-        cls.assertIsNotNone(cls.protImportTS.outputTiltSeries, "SetOfTiltSeries has not been produced.")
+        cls.assertIsNotNone(cls.protImportTS.outputTiltSeries,
+                            "SetOfTiltSeries has not been produced.")
         return cls.protImportTS
 
     @classmethod
     def runImportCtf(cls, **kwargs):
         cls.protImportCtf = cls.newProtocol(ProtImodImportSetOfCtfTomoSeries, **kwargs)
         cls.launchProtocol(cls.protImportCtf)
-        cls.assertIsNotNone(cls.protImportCtf.outputSetOfCTFTomoSeries, "SetOfCTFTomoSeries has not been produced.")
+        cls.assertIsNotNone(cls.protImportCtf.outputSetOfCTFTomoSeries,
+                            "SetOfCTFTomoSeries has not been produced.")
         return cls.protImportCtf
 
     @classmethod
     def runImportCoords(cls, **kwargs):
         cls.protImportCoords = cls.newProtocol(ProtImportCoordinates3D, **kwargs)
         cls.launchProtocol(cls.protImportCoords)
-        cls.assertIsNotNone(cls.protImportCoords.outputCoordinates, "SetOfCoordinates3D has not been produced.")
+        cls.assertIsNotNone(cls.protImportCoords.outputCoordinates,
+                            "SetOfCoordinates3D has not been produced.")
         return cls.protImportCoords
 
 
@@ -77,10 +89,11 @@ class TestSusanCtf(TestBase):
         protCTF.inputTiltSeries.set(self.protImportTS.outputTiltSeries)
         self.launchProtocol(protCTF)
 
-        self.assertIsNotNone(protCTF.outputSetOfCTFTomoSeries, "SetOfCTFTomoSeries has not been produced.")
+        self.assertIsNotNone(protCTF.outputSetOfCTFTomoSeries,
+                             "SetOfCTFTomoSeries has not been produced.")
 
 
-class TestSusanMRA(TestBase):
+class TestSusanMRAWorkflow(TestBase):
     @classmethod
     def setUpClass(cls):
         setupTestProject(cls)
@@ -108,31 +121,42 @@ class TestSusanMRA(TestBase):
         protRecon = ProtImodTomoReconstruction(tomoThickness=110.0)
         protRecon.inputSetOfTiltSeries.set(cls.protImportTS.outputTiltSeries)
         cls.launchProtocol(protRecon)
-        cls.assertIsNotNone(protRecon.outputSetOfTomograms, "SetOfTomograms has not been produced.")
+        cls.assertIsNotNone(protRecon.outputSetOfTomograms,
+                            "SetOfTomograms has not been produced.")
 
         print(magentaStr("\n==> Importing data - coordinates 3D:"))
-        cls.protImportCoords = cls.runImportCoords(filesPath=cls.path,
-                                                   filesPattern="mixed*.tbl",
-                                                   importFrom=3,  # dynamo
-                                                   samplingRate=20.96,
-                                                   boxSize=32,
-                                                   importTomograms=protRecon.outputSetOfTomograms)
+        protImportCoords = cls.runImportCoords(filesPath=cls.path,
+                                               filesPattern="mixed*.tbl",
+                                               importFrom=3,  # dynamo
+                                               samplingRate=20.96,
+                                               boxSize=32,
+                                               importTomograms=protRecon.outputSetOfTomograms)
 
-        print(magentaStr("\n==> Testing susan - average and reconstruct:"))
-        cls.protAvg = ProtSusanAverage(tomoSize=110, boxSize=32)
-        cls.protAvg.inputSetOfCoords3D.set(cls.protImportCoords.outputCoordinates)
-        cls.protAvg.inputTiltSeries.set(cls.protImportCtf.outputSetOfCTFTomoSeries)
-        cls.launchProtocol(cls.protAvg)
-        cls.assertIsNotNone(cls.protAvg.outputAverage, "AverageSubTomogram has not been produced.")
+        print(magentaStr("\n==> Running emantomo - extraction from tomogram:"))
+        cls.protExtract = ProtEmanExtractSubtomo(inputCoordinates=protImportCoords.outputCoordinates,
+                                                 boxSize=32, doInvert=False, doNormalize=True)
+        cls.launchProtocol(cls.protExtract)
+        cls.assertIsNotNone(cls.protExtract.subtomograms,
+                            "SetOfSubTomograms has not been produced.")
 
     def testMRA(self):
+        print(magentaStr("\n==> Testing susan - average and reconstruct:"))
+        protAvg = ProtSusanAverage(tomoSize=110, boxSize=32)
+        protAvg.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
+        protAvg.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
+        self.launchProtocol(protAvg)
+        self.assertIsNotNone(protAvg.outputAverage,
+                             "AverageSubTomogram has not been produced.")
+
         print(magentaStr("\n==> Testing susan - multi-reference alignment:"))
         protMRA = ProtSusanMRA(tomoSize=110, boxSize=32, numberOfIters=2,
-                               coneRange=0, coneSampling=1, inplaneRange=0, inplaneSampling=1,
-                               refine=2, refineFactor=1, allowDrift=True)
-        protMRA.inputSetOfCoords3D.set(self.protImportCoords.outputCoordinates)
+                               coneRange=0, coneSampling=1, inplaneRange=0,
+                               inplaneSampling=1, refine=2, refineFactor=1,
+                               allowDrift=True)
+        protMRA.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
         protMRA.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
-        protMRA.inputRefs.set(self.protAvg.outputAverage)
-        protMRA.inputMasks.set(self.protAvg.outputAverage)
+        protMRA.inputRefs.set(protAvg.outputAverage)
+        protMRA.inputMasks.set(protAvg.outputAverage)
         self.launchProtocol(protMRA)
-        self.assertIsNotNone(protMRA.outputAverage, "AverageSubtomogram has not been produced.")
+        self.assertIsNotNone(protMRA.outputAverage,
+                             "AverageSubtomogram has not been produced.")

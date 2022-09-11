@@ -30,7 +30,6 @@ This script should be launched using the SUSAN python interpreter
 inside its conda environment.
 """
 
-import os
 import re
 from glob import glob
 import numpy as np
