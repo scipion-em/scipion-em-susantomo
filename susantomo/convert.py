@@ -86,8 +86,8 @@ def writeDynTable(fn, setOfSubtomograms, angleMin=0, angleMax=0, scaleFactor=1.0
     for subtomo in setOfSubtomograms.iterSubtomos():
         if hasCoord:
             coord = subtomo.getCoordinate3D()
-            coord.scale(scaleFactor)
             x, y, z = coord.getPosition(const.BOTTOM_LEFT_CORNER)
+            x, y, z = x*scaleFactor, y*scaleFactor, z*scaleFactor
             tomo_id = coord.getVolId()
         else:
             x = 0

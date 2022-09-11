@@ -220,7 +220,7 @@ class ProtSusanBase(EMProtocol):
         return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
     def getScaleFactor(self):
-        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
+        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getCoordinates3D().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
         return samplingRateSubtomos / samplingRateTS
 
