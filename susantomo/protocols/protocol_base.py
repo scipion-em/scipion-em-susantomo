@@ -256,7 +256,6 @@ class ProtSusanBase(EMProtocol):
         return samplingRateSubtomos / samplingRateTS
 
     def hasCtf(self):
-        """ Should be re-defined in subclasses. """
         return isinstance(self.inputTiltSeries.get(), SetOfCTFTomoSeries)
 
     def doCtf(self):

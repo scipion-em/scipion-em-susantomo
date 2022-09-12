@@ -43,9 +43,7 @@ class outputs(Enum):
 
 
 class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
-    """ Average and reconstruct a 3D volume (subtomogram average).
-        This protocol is used to check subtomograms positions import.
-    """
+    """ Average and reconstruct a 3D volume (subtomogram average). """
     _label = 'average and reconstruct'
     _devStatus = BETA
     _possibleOutputs = outputs
