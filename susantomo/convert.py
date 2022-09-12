@@ -77,7 +77,8 @@ def readCtfModelStack(ctfModel, ctfArray, item=0):
         ctfModel.setPhaseShift(ctfPhaseShift)
 
 
-def writeDynTable(fn, setOfSubtomograms, angleMin=0, angleMax=0, scaleFactor=1.0):
+def writeDynTable(fn, setOfSubtomograms, angleMin=0, angleMax=0,
+                  scaleCoords=1.0, scaleShifts=1.0):
     """ Write a Dynamo-style tbl from a set of subtomograms. """
     first = setOfSubtomograms.getFirstItem()
     hasCoord = first.hasCoordinate3D()
@@ -87,7 +88,7 @@ def writeDynTable(fn, setOfSubtomograms, angleMin=0, angleMax=0, scaleFactor=1.0
         if hasCoord:
             coord = subtomo.getCoordinate3D()
             x, y, z = coord.getPosition(const.BOTTOM_LEFT_CORNER)
-            x, y, z = x*scaleFactor, y*scaleFactor, z*scaleFactor
+            x, y, z = x*scaleCoords, y*scaleCoords, z*scaleCoords
             tomo_id = coord.getVolId()
         else:
             x = 0
@@ -96,9 +97,9 @@ def writeDynTable(fn, setOfSubtomograms, angleMin=0, angleMax=0, scaleFactor=1.0
             tomo_id = 0
         if hasTransform:
             tdrot, tilt, narot, shiftx, shifty, shiftz = matrix2eulerAngles(subtomo.getTransform().getMatrix())
-            shiftx *= scaleFactor
-            shifty *= scaleFactor
-            shiftz *= scaleFactor
+            shiftx *= scaleShifts
+            shifty *= scaleShifts
+            shiftz *= scaleShifts
         else:
             tilt = 0
             narot = 0

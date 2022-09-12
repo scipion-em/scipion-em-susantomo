@@ -142,9 +142,9 @@ class ProtSusanBase(EMProtocol):
         """ Prepare input files. """
         inputSubTomos = self.inputSetOfSubTomograms.get()
         fnTable = self._getTmpPath("input_particles.tbl")
-        factor = self.getScaleFactor()
-        if abs(factor - 1.0 > 0.00001):
-            self.info(f"Scaling coordinates by a factor of {factor:0.2f}")
+        scaleCoords = self.getScaleCoords()
+        if abs(scaleCoords - 1.0 > 0.00001):
+            self.info(f"Scaling coordinates by a factor of {scaleCoords:0.2f}")
 
         tsSet = self._getInputTs()
         tsIds_from_ts = set(item.getTsId() for item in tsSet)
@@ -158,7 +158,9 @@ class ProtSusanBase(EMProtocol):
         angleMin = tsSet.getAcquisition().getAngleMin() or 0
 
         with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputSubTomos, angleMin, angleMax, scaleFactor=factor)
+            writeDynTable(fn, inputSubTomos, angleMin, angleMax,
+                          scaleCoords=scaleCoords,
+                          scaleShifts=self.getScaleShifts())
 
         if self.hasCtf():
             # generate defocus files
@@ -219,8 +221,13 @@ class ProtSusanBase(EMProtocol):
             return self.inputTiltSeries.get().getSetOfTiltSeries(pointer=pointer)
         return self.inputTiltSeries.get() if not pointer else self.inputTiltSeries
 
-    def getScaleFactor(self):
-        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getCoordinates3D().getSamplingRate()
+    def getScaleCoords(self):
+        samplingRateCoords = self.inputSetOfSubTomograms.get().getCoordinates3D().getSamplingRate()
+        samplingRateTS = self._getInputTs().getSamplingRate()
+        return samplingRateCoords / samplingRateTS
+
+    def getScaleShifts(self):
+        samplingRateSubtomos = self.inputSetOfSubTomograms.get().getSamplingRate()
         samplingRateTS = self._getInputTs().getSamplingRate()
         return samplingRateSubtomos / samplingRateTS
 
