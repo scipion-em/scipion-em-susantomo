@@ -27,14 +27,11 @@
 # **************************************************************************
 
 import os
-import sys
-import fileinput
 import json
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
 import pyworkflow.utils as pwutils
-from pwem import emlib
 
 from tomo.objects import (SetOfTiltSeries, AverageSubTomogram,
                           SetOfAverageSubTomograms)
@@ -58,7 +55,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def _defineProcessParams(self, form):
         form.addParam('numberOfIters', params.IntParam,
                       label='Iterations', default=3,
-                      help="Number of iterations to run.")
+                      help="Number of iterations to run in a given round.")
         form.addParam('ctfCorrAln', params.EnumParam,
                       choices=['none', 'on_reference', 'on_substack',
                                'wiener_ssnr', 'wiener_white', 'cfsc'],
@@ -66,27 +63,22 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="CTF correction method (aligner)")
 
         form.addSection(label='References')
-        form.addParam('contMsg', params.LabelParam,
-                      condition="doContinue",
-                      label="In continue mode these options are not available.")
         form.addParam('inputRefs', params.MultiPointerParam,
                       important=True,
                       allowsNull=True,
                       pointerClass='AverageSubTomogram, Volume',
-                      label="Input references",
-                      condition="not doContinue")
+                      label="Input references.")
         form.addParam('inputMasks', params.MultiPointerParam,
                       important=True,
                       allowsNull=True,
-                      condition="not doContinue",
-                      label="Alignment mask",
+                      label="Alignment masks",
                       pointerClass='Volume, VolumeMask',
                       help='Need to have the same dimensions as the template. '
                            'Masks order should match the references.')
 
         form.addSection(label='Angular scanning')
         form.addParam('randomizeAngles', params.BooleanParam,
-                      label='Rotate subtomograms randomly at the start?',
+                      label='Randomize input orientations?',
                       condition="not doContinue",
                       default=False)
         form.addParam('coneRange', params.IntParam,
@@ -120,7 +112,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                            "'in-plane range' to 0 and "
                            "'in-plane sampling' to 1")
         form.addParam('inplaneSampling', params.IntParam,
-                      label='In-plane rotation sampling', default=45,
+                      label='In-plane rotation sampling', default=60,
                       help="Defines the angular interval (in degrees) for "
                            "in-plane rotations")
         form.addParam('refine', params.IntParam,
@@ -132,65 +124,44 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                            "process will be repeated for each particle.")
         form.addParam('refineFactor', params.IntParam,
                       label='Refine factor', default=2,
-                      help="This defines the range of the new set of angles. "
-                           "A value of 2, for instance, means that the range "
-                           "of the new grid should twice as large as the step "
-                           "of the old grid.")
+                      help="This controls the size of the angular neighbourhood "
+                           "during the local refinement of the angular grid. "
+                           "In particular, the scanning range at the refinement "
+                           "level [i+1] will be determined by the scanning step "
+                           "at level [i].\n\n Example:\n"
+                           "cone_range[i+1] = refine_factor * cone_sampling[i];\n"
+                           "inplane_range[i+1] = refine_factor * inplane_sampling[i];")
 
         form.addSection(label='Shifts & thresholds')
         form.addParam('allowDrift', params.BooleanParam, default=True,
                       label="Allow drift?",
                       help="Take into account shifts from previous iteration. "
                            "Equivalent to DYNAMO's area search modus 2.")
-        form.addParam('offsetRange', params.IntParam, default=20,
+        form.addParam('offsetRange', params.IntParam, default=12,
                       label="Offset range (px)")
-        form.addParam('offsetStep', params.IntParam, default=2,
+        form.addParam('offsetStep', params.IntParam, default=4,
                       label="Offset step (px)")
         form.addParam('threshold', params.FloatParam,
-                      label='CC threshold', default=0.8,
+                      label='CC threshold', default=0.9,
                       help='Threshold value for CC (cross-correlation). '
                            'Determines the fraction of particles to be used '
                            'for reconstruction.')
         line = form.addLine("Band-pass filter (freq.)")
-        line.addParam('low', params.IntParam, label='Low frequency', default=32)
-        line.addParam('high', params.IntParam, label='High frequency', default=2)
+        line.addParam('low', params.IntParam,
+                      label='Low frequency (px)', default=11)
+        line.addParam('high', params.IntParam,
+                      label='High frequency (px)', default=2)
         form.addParam('incLowpass', params.BooleanParam, default=False,
                       label="Increase the lowpass filter on each iteration?")
 
     # --------------------------- STEPS functions -----------------------------
     def continueStep(self):
-        """ Copy the project and inputs from the previous run. """
+        """ Copy the ptclsraw from the previous run. """
+        from ..scripts.base import getIterNumber
         prevRun = self.previousRun.get()
-        for p in ["mra", "input"]:
-            prevProj = prevRun._getExtraPath(p)
-            pwutils.copyTree(prevProj, self._getExtraPath(p))
-
-        # convert previous TS stacks again
-        tsSet = prevRun._getInputTs()
-        for ts in tsSet:
-            tsId = ts.getTsId()
-            tsInputFn = ts.getFirstItem().getFileName()
-            tsFn = self._getTmpPath(tsId + ".mrc")
-
-            # has to be float32
-            ih = emlib.image.ImageHandler()
-            if ih.getDataType(tsInputFn) != emlib.DT_FLOAT:
-                ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
-            elif pwutils.getExt(tsInputFn) in ['.mrc', '.st', '.mrcs', '.ali']:
-                pwutils.createAbsLink(os.path.abspath(tsInputFn), tsFn)
-            else:
-                ih.convert(tsInputFn, tsFn, emlib.DT_FLOAT)
-
-        # update stack paths in tomostxt
-        tomosFn = self._getExtraPath("input/input_tomos.tomostxt")
-        for line in fileinput.input(tomosFn, inplace=True):
-            if "stack_file:" in line:
-                tomo = os.path.basename(line.split(":")[-1])
-                line = f"stack_file:{os.path.abspath(self._getTmpPath(tomo))}"
-            sys.stdout.write(line)
-
-        # count previous refs
-        self.refs_nums = len(prevRun.inputRefs)
+        lastIter = getIterNumber(prevRun._getExtraPath("mra/ite_*"))
+        prevPtcls = prevRun._getExtraPath(f"mra/{lastIter:04d}/particles.ptclsraw")
+        pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
     def convertInputRefs(self):
         self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
@@ -198,9 +169,24 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     def runSusanStep(self):
         """ Run susan_aligner and susan_reconstruct programs. """
+        tsSet = self._getInputTs()
+        tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
+
         self.params = {
             'continue': bool(self.doContinue),
-            'refs_nums': self.refs_nums if self.doContinue else len(self.refs),
+            'refs_nums': len(self.refs),
+            'ts_nums': self.ids,
+            'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
+            'pix_size': tsSet.getSamplingRate(),
+            'tomo_size': tomo_size,
+            'voltage': tsSet.getAcquisition().getVoltage(),
+            'sph_aber': tsSet.getAcquisition().getSphericalAberration(),
+            'amp_cont': tsSet.getAcquisition().getAmplitudeContrast(),
+            'inputStacks': self.stacks,
+            'inputAngles': self.tilts,
+            'inputRefs': self.refs,
+            'inputMasks': self.masks,
+            'has_ctf': self.hasCtf(),
             'box_size': self.boxSize.get(),
             'gpus': self.getGpuList(),
             'thr_per_gpu': self.numberOfThreads.get(),
@@ -223,24 +209,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'randomize': bool(self.randomizeAngles)
         }
 
-        if not self.doContinue:
-            tsSet = self._getInputTs()
-            tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
-            self.params.update({
-                'ts_nums': self.ids,
-                'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
-                'pix_size': tsSet.getSamplingRate(),
-                'tomo_size': tomo_size,
-                'voltage': tsSet.getAcquisition().getVoltage(),
-                'sph_aber': tsSet.getAcquisition().getSphericalAberration(),
-                'amp_cont': tsSet.getAcquisition().getAmplitudeContrast(),
-                'inputStacks': self.stacks,
-                'inputAngles': self.tilts,
-                'inputRefs': self.refs,
-                'inputMasks': self.masks,
-                'has_ctf': self.hasCtf()
-            })
-
         jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
             json.dump(self.params, fn, indent=4)
@@ -250,14 +218,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                     env=Plugin.getEnviron(), cwd=self._getExtraPath())
 
     def createOutputStep(self):
-        if self.doContinue:
-            imgSet = self.previousRun.get()._getInputTs()
-            imgSetPointer = self.previousRun.get()._getInputTs(pointer=True)
-        else:
-            imgSet = self._getInputTs()
-            imgSetPointer = self._getInputTs(pointer=True)
-
-        pixSize = imgSet.getSamplingRate()
+        pixSize = self._getInputTs().getSamplingRate()
         nRefs = self.params['refs_nums']
         volume = AverageSubTomogram()
 
@@ -281,7 +242,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             volumes = _createVolume(1)
 
         self._defineOutputs(**{f"outputAverage{'s' if nRefs > 1 else ''}": volumes})
-        self._defineSourceRelation(imgSetPointer, volumes)
+        self._defineSourceRelation(self._getInputTs(pointer=True), volumes)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -289,22 +250,29 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         refs = self.inputRefs
         masks = self.inputMasks
 
-        if not self.doContinue:
-            if self.doCtf() and isinstance(self.inputTiltSeries.get(),
-                                           SetOfTiltSeries):
-                errors.append("CTF correction requires that you provide "
-                              "CTFTomoSeries as input")
-            if any([not refs.hasValue(), not masks.hasValue()]):
-                errors.append("Input references and masks are required!")
+        if self.doContinue and not self.previousRun.hasValue():
+            errors.append("Please input the previous protocol run.")
+
+        if self.doCtf() and isinstance(self.inputTiltSeries.get(),
+                                       SetOfTiltSeries):
+            errors.append("CTF correction requires that you provide "
+                          "CTFTomoSeries as input")
 
         if self.numberOfIters.get() == 1 and self.incLowpass:
             errors.append("You cannot increase lowpass when doing only 1 iteration.")
 
+        if not refs.hasValue() or not masks.hasValue():
+            errors.append("Input references and masks are required!")
+
         if len(refs) != len(masks):
             errors.append("Number of references and masks must be the same.")
 
-        if self.doContinue and not self.previousRun.hasValue():
-            errors.append("Please input the previous protocol run.")
+        pix_sizes = [self._getInputTs().getSamplingRate()]
+        pix_sizes.extend([r.get().getSamplingRate() for r in refs])
+        pix_sizes.extend([m.get().getSamplingRate() for m in masks])
+        if len(set(pix_sizes)) != 1:
+            errors.append("Pixel size of input tilt-series, references and "
+                          "masks must be the same.")
 
         return errors
 

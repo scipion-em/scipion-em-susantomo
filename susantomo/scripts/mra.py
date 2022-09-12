@@ -41,18 +41,9 @@ from base import *
 
 def runAlignment(params, doContinue=False):
     """ Execute MRA project in the output_dir folder. """
-    if doContinue:
-        mngr = SUSAN.project.Manager('mra')  # only accepts a name, not a path
-        lastIter = getIterNumber('mra/ite_*') + 1
-        if lastIter is None:
-            raise Exception("Could not find last iteration number")
-        mngr.initial_reference = f"mra/ite_{lastIter:04d}/reference.refstxt"
-        mngr.initial_particles = f"mra/ite_{lastIter:04d}/particles.ptclsraw"
-    else:
-        lastIter = 1
-        mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
-        mngr.initial_reference = "input/input_refs.refstxt"
-        mngr.initial_particles = "input/input_particles.ptclsraw"
+    mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
+    mngr.initial_reference = "input/input_refs.refstxt"
+    mngr.initial_particles = "input/input_particles.ptclsraw"
 
     mngr.tomogram_file = "input/input_tomos.tomostxt"
 
@@ -75,7 +66,7 @@ def runAlignment(params, doContinue=False):
     lp = params['low']
     n_refs = params['refs_nums']
 
-    for i in range(lastIter, lastIter + params['iter'] + 1):
+    for i in range(1, params['iter'] + 1):
         mngr.aligner.bandpass.lowpass = lp
         bp = mngr.execute_iteration(i)
         if n_refs > 1:
@@ -110,10 +101,11 @@ if __name__ == '__main__':
             with open(inputJson) as fn:
                 params = json.load(fn)
 
+            createTomosFile(params)
+            createRefsFile(params, params['refs_nums'])
+
             if not params['continue']:
-                createTomosFile(params)
                 createPtclsFile(params, params['refs_nums'])
-                createRefsFile(params, params['refs_nums'])
 
             runAlignment(params, doContinue=params['continue'])
             reconstructAvg(params)

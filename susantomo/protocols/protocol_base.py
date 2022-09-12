@@ -61,13 +61,14 @@ class ProtSusanBase(EMProtocol):
 
         form.addParam('inputSetOfSubTomograms', params.PointerParam,
                       pointerClass="SetOfSubTomograms",
+                      condition="not doContinue",
                       important=True,
                       label='Input subtomograms',
                       help="Set of subtomograms that will be used to fetch "
-                           "alignment and coordinates information.")
+                           "coordinates information. *Input alignment is "
+                           "ignored at the moment.*")
         form.addParam('inputTiltSeries',
                       params.PointerParam,
-                      condition="not doContinue",
                       pointerClass='SetOfCTFTomoSeries, SetOfTiltSeries',
                       important=True,
                       label='CTF tomo series or tilt-series (aligned)',
@@ -76,7 +77,9 @@ class ProtSusanBase(EMProtocol):
         form.addParam('tomoSize', params.IntParam,
                       default=110, label='Tomogram thickness (px)',
                       help='Z height of a tomogram volume in '
-                           'pixels. Required for tilt series stack.')
+                           'pixels. Required for tilt series stack. '
+                           'Pixel size will be the same as input '
+                           'tilt series.')
         form.addParam('boxSize', params.IntParam,
                       default=32, label='Output box size (voxels)',
                       help='Size of the reconstructed average volume in '
@@ -112,7 +115,12 @@ class ProtSusanBase(EMProtocol):
     def _defineContinueParams(self, form):
         """ Can be re-defined in subclasses. """
         form.addParam('doContinue', params.BooleanParam, default=False,
-                      label="Continue previous run?")
+                      label="Continue previous run?",
+                      help="Particles metadata from the previous "
+                           "protocol run will be used. You still have "
+                           "to provide tilt-series, references and masks. "
+                           "They can have a different binning compared to "
+                           "the previous run.")
         form.addParam('previousRun', params.PointerParam,
                       pointerClass=self.getClassName(),
                       important=True,
@@ -128,8 +136,7 @@ class ProtSusanBase(EMProtocol):
     def _insertAllSteps(self):
         if self.isContinue():
             self._insertFunctionStep(self.continueStep)
-        else:
-            self._insertFunctionStep(self.convertInputStep)
+        self._insertFunctionStep(self.convertInputStep)
         self._insertFunctionStep(self.runSusanStep)
         self._insertFunctionStep(self.createOutputStep)
 
@@ -140,27 +147,30 @@ class ProtSusanBase(EMProtocol):
 
     def convertInputStep(self):
         """ Prepare input files. """
-        inputSubTomos = self.inputSetOfSubTomograms.get()
-        fnTable = self._getTmpPath("input_particles.tbl")
-        scaleCoords = self.getScaleCoords()
-        if abs(scaleCoords - 1.0 > 0.00001):
-            self.info(f"Scaling coordinates by a factor of {scaleCoords:0.2f}")
-
         tsSet = self._getInputTs()
-        tsIds_from_ts = set(item.getTsId() for item in tsSet)
-        tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
-        if not tsIds_from_ts.issubset(tsIds_from_subtomos):
-            self.warning("Found subtomos with tsId that did not match "
-                         "provided tilt-series: "
-                         f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
 
-        angleMax = tsSet.getAcquisition().getAngleMax() or 0
-        angleMin = tsSet.getAcquisition().getAngleMin() or 0
+        if not self.isContinue():
+            inputSubTomos = self.inputSetOfSubTomograms.get()
+            scaleCoords = self.getScaleCoords()
+            if abs(scaleCoords - 1.0 > 0.00001):
+                self.info(f"Scaling coordinates by a factor of {scaleCoords:0.2f}")
 
-        with open(fnTable, 'w') as fn:
-            writeDynTable(fn, inputSubTomos, angleMin, angleMax,
-                          scaleCoords=scaleCoords,
-                          scaleShifts=self.getScaleShifts())
+            tsSet = self._getInputTs()
+            tsIds_from_ts = set(item.getTsId() for item in tsSet)
+            tsIds_from_subtomos = set(inputSubTomos.getTomograms().keys())
+            if not tsIds_from_ts.issubset(tsIds_from_subtomos):
+                self.warning("Found subtomos with tsId that did not match "
+                             "provided tilt-series: "
+                             f"{set.difference(tsIds_from_subtomos, tsIds_from_ts)}")
+
+            angleMax = tsSet.getAcquisition().getAngleMax() or 0
+            angleMin = tsSet.getAcquisition().getAngleMin() or 0
+
+            fnTable = self._getTmpPath("input_particles.tbl")
+            with open(fnTable, 'w') as fn:
+                writeDynTable(fn, inputSubTomos, angleMin, angleMax,
+                              scaleCoords=scaleCoords,
+                              scaleShifts=self.getScaleShifts())
 
         if self.hasCtf():
             # generate defocus files
