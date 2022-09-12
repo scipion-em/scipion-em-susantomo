@@ -44,7 +44,6 @@ def runAlignment(params, doContinue=False):
     mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
     mngr.initial_reference = "input/input_refs.refstxt"
     mngr.initial_particles = "input/input_particles.ptclsraw"
-
     mngr.tomogram_file = "input/input_tomos.tomostxt"
 
     mngr.list_gpus_ids = list(params['gpus'])

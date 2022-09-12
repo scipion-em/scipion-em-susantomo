@@ -28,6 +28,8 @@
 
 import os
 import json
+import re
+from glob import glob
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
@@ -157,10 +159,9 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     # --------------------------- STEPS functions -----------------------------
     def continueStep(self):
         """ Copy the ptclsraw from the previous run. """
-        from ..scripts.base import getIterNumber
         prevRun = self.previousRun.get()
-        lastIter = getIterNumber(prevRun._getExtraPath("mra/ite_*"))
-        prevPtcls = prevRun._getExtraPath(f"mra/{lastIter:04d}/particles.ptclsraw")
+        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
+        prevPtcls = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/particles.ptclsraw")
         pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
     def convertInputRefs(self):
@@ -287,3 +288,14 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     def isContinue(self):
         return self.doContinue
+
+    def getIterNumber(self, path):
+        """ Return the last iteration number. """
+        result = None
+        files = sorted(glob(path))
+        if files:
+            f = files[-1]
+            s = re.compile('ite_(\d{4})').search(f)
+            if s:
+                result = int(s.group(1))  # group 1 is 1 digit iteration number
+        return result

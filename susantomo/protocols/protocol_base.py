@@ -134,9 +134,9 @@ class ProtSusanBase(EMProtocol):
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
+        self._insertFunctionStep(self.convertInputStep)
         if self.isContinue():
             self._insertFunctionStep(self.continueStep)
-        self._insertFunctionStep(self.convertInputStep)
         self._insertFunctionStep(self.runSusanStep)
         self._insertFunctionStep(self.createOutputStep)
 
