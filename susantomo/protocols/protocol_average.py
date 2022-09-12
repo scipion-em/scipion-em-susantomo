@@ -53,10 +53,6 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def __init__(self, **args):
         ProtSusanBase.__init__(self, **args)
 
-    def _defineContinueParams(self, form):
-        form.addHidden('doContinue', params.BooleanParam,
-                       default=False)
-
     # --------------------------- STEPS functions -----------------------------
     def runSusanStep(self):
         """ Run susan_reconstruct program. """
@@ -64,6 +60,7 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
         tomo_size = [tsSet.getDim()[0], tsSet.getDim()[1], self.tomoSize.get()]
 
         params = {
+            'continue': bool(self.doContinue),
             'ts_nums': self.ids,
             'inputStacks': self.stacks,
             'inputAngles': self.tilts,

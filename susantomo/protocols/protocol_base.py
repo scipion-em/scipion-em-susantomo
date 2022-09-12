@@ -27,6 +27,8 @@
 # **************************************************************************
 
 import os
+import re
+from glob import glob
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
@@ -142,8 +144,11 @@ class ProtSusanBase(EMProtocol):
 
     # --------------------------- STEPS functions -----------------------------
     def continueStep(self):
-        """ Should be implemented in sub-classes. """
-        raise NotImplementedError
+        """ Copy the ptclsraw from the previous run. """
+        prevRun = self.previousRun.get()
+        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
+        prevPtcls = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/particles.ptclsraw")
+        pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
     def convertInputStep(self):
         """ Prepare input files. """
@@ -261,3 +266,14 @@ class ProtSusanBase(EMProtocol):
     def isContinue(self):
         """ Should be re-defined in subclasses. """
         return self.doContinue
+
+    def getIterNumber(self, path):
+        """ Return the last iteration number. """
+        result = None
+        files = sorted(glob(path))
+        if files:
+            f = files[-1]
+            s = re.compile('ite_(\d{4})').search(f)
+            if s:
+                result = int(s.group(1))  # group 1 is 1 digit iteration number
+        return result

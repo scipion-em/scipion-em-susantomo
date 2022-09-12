@@ -62,7 +62,8 @@ if __name__ == '__main__':
                 params = json.load(fn)
 
             createTomosFile(params)
-            createPtclsFile(params, n_refs=1)
+            if not params['continue']:
+                createPtclsFile(params, n_refs=1)
             reconstructAvg(params)
         else:
             raise FileNotFoundError(inputJson)

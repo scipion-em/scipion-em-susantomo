@@ -28,12 +28,10 @@
 
 import os
 import json
-import re
-from glob import glob
+
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
-import pyworkflow.utils as pwutils
 
 from tomo.objects import AverageSubTomogram, SetOfAverageSubTomograms
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
@@ -156,13 +154,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="Increase the lowpass filter on each iteration?")
 
     # --------------------------- STEPS functions -----------------------------
-    def continueStep(self):
-        """ Copy the ptclsraw from the previous run. """
-        prevRun = self.previousRun.get()
-        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
-        prevPtcls = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/particles.ptclsraw")
-        pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
-
     def convertInputRefs(self):
         self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
         self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
@@ -277,14 +268,3 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
-
-    def getIterNumber(self, path):
-        """ Return the last iteration number. """
-        result = None
-        files = sorted(glob(path))
-        if files:
-            f = files[-1]
-            s = re.compile('ite_(\d{4})').search(f)
-            if s:
-                result = int(s.group(1))  # group 1 is 1 digit iteration number
-        return result
