@@ -53,6 +53,22 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def __init__(self, **args):
         ProtSusanBase.__init__(self, **args)
 
+    # -------------------------- DEFINE param functions -----------------------
+    def _defineContinueParams(self, form):
+        form.addParam('doContinue', params.BooleanParam, default=False,
+                      label="Use MRA output?",
+                      help="Particles metadata from the previous MRA "
+                           "protocol run will be used. You still have "
+                           "to provide tilt-series. "
+                           "They can have a different binning compared to "
+                           "the previous run.")
+        form.addParam('previousRun', params.PointerParam,
+                      pointerClass="ProtSusanMRA",
+                      important=True,
+                      allowsNull=True,
+                      condition="doContinue",
+                      label="Select previous MRA run")
+
     # --------------------------- STEPS functions -----------------------------
     def runSusanStep(self):
         """ Run susan_reconstruct program. """
