@@ -107,12 +107,7 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
-        errors = []
-
-        if self.ctfCorrAvg.get() and isinstance(self.inputTiltSeries.get(),
-                                                SetOfTiltSeries):
-            errors.append("CTF correction requires that you provide "
-                          "CTFTomoSeries as input")
+        errors = self._validateBase()
 
         return errors
 
@@ -125,3 +120,5 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
             summary.append("Output is not ready")
 
     # --------------------------- UTILS functions -----------------------------
+    def doCtf(self):
+        return self.ctfCorrAvg.get()

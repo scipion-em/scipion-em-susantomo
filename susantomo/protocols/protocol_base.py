@@ -35,7 +35,7 @@ from pyworkflow.plugin import Domain
 from pwem import emlib
 from pwem.protocols import EMProtocol
 
-from tomo.objects import SetOfCTFTomoSeries
+from tomo.objects import SetOfCTFTomoSeries, SetOfTiltSeries
 
 from ..convert import writeDynTable
 
@@ -213,9 +213,18 @@ class ProtSusanBase(EMProtocol):
         raise NotImplementedError
 
     # --------------------------- INFO functions ------------------------------
-    def _validate(self):
+    def _validateBase(self):
         """ Should be re-defined in subclasses. """
-        return []
+        errors = []
+        if self.doContinue and not self.previousRun.hasValue():
+            errors.append("Please input the previous protocol run.")
+
+        if self.doCtf() and isinstance(self.inputTiltSeries.get(),
+                                       SetOfTiltSeries):
+            errors.append("CTF correction requires that you provide "
+                          "CTFTomoSeries as input")
+
+        return errors
 
     def _summary(self):
         """ Should be re-defined in subclasses. """
@@ -245,6 +254,10 @@ class ProtSusanBase(EMProtocol):
         """ Should be re-defined in subclasses. """
         return isinstance(self.inputTiltSeries.get(), SetOfCTFTomoSeries)
 
-    def isContinue(self):
+    def doCtf(self):
         """ Should be re-defined in subclasses. """
         return False
+
+    def isContinue(self):
+        """ Should be re-defined in subclasses. """
+        return self.doContinue

@@ -35,8 +35,7 @@ import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
 import pyworkflow.utils as pwutils
 
-from tomo.objects import (SetOfTiltSeries, AverageSubTomogram,
-                          SetOfAverageSubTomograms)
+from tomo.objects import AverageSubTomogram, SetOfAverageSubTomograms
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
@@ -247,17 +246,10 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
-        errors = []
+        errors = self._validateBase()
+
         refs = self.inputRefs
         masks = self.inputMasks
-
-        if self.doContinue and not self.previousRun.hasValue():
-            errors.append("Please input the previous protocol run.")
-
-        if self.doCtf() and isinstance(self.inputTiltSeries.get(),
-                                       SetOfTiltSeries):
-            errors.append("CTF correction requires that you provide "
-                          "CTFTomoSeries as input")
 
         if self.numberOfIters.get() == 1 and self.incLowpass:
             errors.append("You cannot increase lowpass when doing only 1 iteration.")
@@ -285,9 +277,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
-
-    def isContinue(self):
-        return self.doContinue
 
     def getIterNumber(self, path):
         """ Return the last iteration number. """
