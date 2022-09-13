@@ -228,6 +228,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             volumes.setSamplingRate(pixSize)
             for i in range(nRefs):
                 volume = _createVolume(i+1)
+                volume.setClassId(i+1)
                 volumes.append(volume)
         else:
             volumes = _createVolume(1)

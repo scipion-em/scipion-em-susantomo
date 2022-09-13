@@ -148,6 +148,7 @@ class ProtSusanBase(EMProtocol):
         prevRun = self.previousRun.get()
         lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
         prevPtcls = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/particles.ptclsraw")
+        self.info(f"Copying particles from the previous run: {prevPtcls}")
         pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
     def convertInputStep(self):
