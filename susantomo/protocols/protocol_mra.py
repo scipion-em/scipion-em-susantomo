@@ -62,12 +62,17 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="CTF correction method (aligner)")
 
         form.addSection(label='References')
+        form.addParam('reuseRefs', params.BooleanParam, default=True,
+                      condition='doContinue',
+                      label="Re-use references and masks from the previous run?")
         form.addParam('inputRefs', params.MultiPointerParam,
+                      condition="not reuseRefs",
                       important=True,
                       allowsNull=True,
                       pointerClass='AverageSubTomogram, Volume',
                       label="Input references.")
         form.addParam('inputMasks', params.MultiPointerParam,
+                      condition="not reuseRefs",
                       important=True,
                       allowsNull=True,
                       label="Alignment masks",
@@ -155,8 +160,9 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     # --------------------------- STEPS functions -----------------------------
     def convertInputRefs(self):
-        self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
-        self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
+        if not self.reuseRefs:
+            self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
+            self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
 
     def runSusanStep(self):
         """ Run susan_aligner and susan_reconstruct programs. """
@@ -165,6 +171,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
         self.params = {
             'continue': bool(self.doContinue),
+            'reuse_refs': bool(self.reuseRefs),
             'refs_nums': len(self.refs),
             'ts_nums': self.ids,
             'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
@@ -199,6 +206,9 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'offsets': [self.offsetRange.get(), self.offsetStep.get()],
             'randomize': bool(self.randomizeAngles)
         }
+
+        if self.doContinue and self.reuseRefs:
+            self.params['refs_nums'] = self.getOldNumRefs()
 
         jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
@@ -269,3 +279,13 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
+
+    def getOldNumRefs(self):
+        prevRun = self.previousRun.get()
+        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
+        prevRefs = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/reference.refstxt")
+
+        with open(prevRefs) as f:
+            nrefs = int(f.readline().split(":")[-1])
+
+        return nrefs

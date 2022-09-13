@@ -101,7 +101,9 @@ if __name__ == '__main__':
                 params = json.load(fn)
 
             createTomosFile(params)
-            createRefsFile(params, params['refs_nums'])
+
+            if not params['reuse_refs']:
+                createRefsFile(params, params['refs_nums'])
 
             if not params['continue']:
                 createPtclsFile(params, params['refs_nums'])
