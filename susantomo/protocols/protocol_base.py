@@ -136,9 +136,10 @@ class ProtSusanBase(EMProtocol):
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
-        self._insertFunctionStep(self.convertInputStep)
+        pwutils.makePath(self._getExtraPath("input"))
         if self.isContinue():
             self._insertFunctionStep(self.continueStep)
+        self._insertFunctionStep(self.convertInputStep)
         self._insertFunctionStep(self.runSusanStep)
         self._insertFunctionStep(self.createOutputStep)
 
@@ -212,7 +213,6 @@ class ProtSusanBase(EMProtocol):
             self.tilts.append(os.path.abspath(tiltFn))
             self.ids.append(ts.getObjId())
 
-        pwutils.makePath(self._getExtraPath("input"))
         self.convertInputRefs()
 
     def runSusanStep(self):

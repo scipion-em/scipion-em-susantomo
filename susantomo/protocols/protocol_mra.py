@@ -28,7 +28,8 @@
 
 import os
 import json
-
+import fileinput
+import sys
 
 import pyworkflow.protocol.params as params
 from pyworkflow.constants import BETA
@@ -163,6 +164,15 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         if not self.reuseRefs:
             self.refs.extend([os.path.abspath(i.get().getFileName()) for i in self.inputRefs])
             self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
+        else:
+            # replace relative paths with absolute
+            prevRunDir = self.previousRun.get()._getExtraPath("mra")
+            refsFn = self._getExtraPath("input/input_refs.refstxt")
+            with fileinput.input(refsFn, inplace=True) as fn:
+                for line in fn:
+                    line = line.replace(":mra",
+                                        f":{os.path.abspath(prevRunDir)}")
+                    sys.stdout.write(line)
 
     def runSusanStep(self):
         """ Run susan_aligner and susan_reconstruct programs. """
@@ -172,7 +182,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         self.params = {
             'continue': bool(self.doContinue),
             'reuse_refs': bool(self.reuseRefs),
-            'refs_nums': len(self.refs),
+            'refs_nums': len(self.refs) if not self.reuseRefs else self.getOldNumRefs(),
             'ts_nums': self.ids,
             'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
             'pix_size': tsSet.getSamplingRate(),
@@ -206,9 +216,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'offsets': [self.offsetRange.get(), self.offsetStep.get()],
             'randomize': bool(self.randomizeAngles)
         }
-
-        if self.doContinue and self.reuseRefs:
-            self.params['refs_nums'] = self.getOldNumRefs()
 
         jsonFn = self._getTmpPath("params.json")
         with open(jsonFn, "w") as fn:
