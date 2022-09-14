@@ -46,7 +46,7 @@ def runAlignment(params, doContinue=False):
     mngr.initial_particles = "input/input_particles.ptclsraw"
     mngr.tomogram_file = "input/input_tomos.tomostxt"
 
-    mngr.list_gpus_ids = list(params['gpus'])
+    mngr.list_gpus_ids = params['gpus']
     mngr.threads_per_gpu = params['thr_per_gpu']
     mngr.aligner.ctf_correction = params['ctf_corr_aln']
     mngr.aligner.allow_drift = params['allow_drift']
@@ -80,10 +80,10 @@ def runAlignment(params, doContinue=False):
 def reconstructAvg(params):
     """ Reconstruct an average 3D volume. """
     avgr = SUSAN.modules.Averager()
-    avgr.list_gpus_ids = list(params['gpus'])
+    avgr.list_gpus_ids = params['gpus']
     avgr.threads_per_gpu = params['thr_per_gpu']
     avgr.ctf_correction = params['ctf_corr_avg']
-    avgr.rec_halfsets = bool(params['do_halfsets'])
+    avgr.rec_halfsets = params['do_halfsets']
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
     lastIter = getIterNumber('mra/ite_*')

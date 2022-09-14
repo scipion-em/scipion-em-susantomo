@@ -42,10 +42,10 @@ from base import *
 def reconstructAvg(params):
     """ Reconstruct an average 3D volume. """
     avgr = SUSAN.modules.Averager()
-    avgr.list_gpus_ids = list(params['gpus'])
+    avgr.list_gpus_ids = params['gpus']
     avgr.threads_per_gpu = params['thr_per_gpu']
     avgr.ctf_correction = params['ctf_corr_avg']
-    avgr.rec_halfsets = bool(params['do_halfsets'])
+    avgr.rec_halfsets = params['do_halfsets']
     avgr.symmetry = params['symmetry']
     avgr.padding_type = params['padding']
     avgr.reconstruct("average", "input/input_tomos.tomostxt",

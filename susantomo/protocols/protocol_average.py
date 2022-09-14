@@ -89,7 +89,7 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'thr_per_gpu': self.numberOfThreads.get(),
             'has_ctf': self.hasCtf(),
             'ctf_corr_avg': self.getEnumText('ctfCorrAvg'),
-            'do_halfsets': self.doHalfSets.get(),
+            'do_halfsets': bool(self.doHalfSets.get()),
             'symmetry': self.sym.get(),
             'padding': self.getEnumText('padding')
         }

@@ -200,7 +200,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'thr_per_gpu': self.numberOfThreads.get(),
             'ctf_corr_avg': self.getEnumText('ctfCorrAvg'),
             'ctf_corr_aln': self.getEnumText('ctfCorrAln'),
-            'do_halfsets': self.doHalfSets.get(),
+            'do_halfsets': bool(self.doHalfSets.get()),
             'symmetry': self.sym.get(),
             'padding': self.getEnumText('padding'),
             'iter': self.numberOfIters.get(),
