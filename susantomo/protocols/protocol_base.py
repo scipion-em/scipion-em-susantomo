@@ -123,12 +123,12 @@ class ProtSusanBase(EMProtocol):
                            "to provide tilt-series, references and masks. "
                            "They can have a different binning compared to "
                            "the previous run.")
-        form.addParam('previousRun', params.PointerParam,
-                      pointerClass=self.getClassName(),
+        form.addParam('inputSubstacks', params.PointerParam,
+                      pointerClass="TomoSubStacks",
                       important=True,
                       allowsNull=True,
                       condition="doContinue",
-                      label="Select previous run")
+                      label="Substacks from the previous run")
 
     def _defineProcessParams(self, form):
         """ Should be implemented in subclasses. """

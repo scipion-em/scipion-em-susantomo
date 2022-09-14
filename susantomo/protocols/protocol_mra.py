@@ -38,6 +38,7 @@ from tomo.objects import AverageSubTomogram, SetOfAverageSubTomograms
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
+from ..objects import TomoSubStacks
 from .protocol_base import ProtSusanBase
 
 
@@ -253,6 +254,13 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         self._defineOutputs(**{f"outputAverage{'s' if nRefs > 1 else ''}": volumes})
         self._defineSourceRelation(self._getInputTs(pointer=True), volumes)
 
+        lastIter = self.getIterNumber(self._getExtraPath("mra/ite_*"))
+        stacksFn = f"mra/ite_{lastIter:04d}/particles.ptclsraw"
+        numParts = self.getNumParts()
+        substacks = TomoSubStacks(filename=self._getExtraPath(stacksFn),
+                                  n_ptcl=numParts, n_refs=nRefs)
+        self._defineOutputs({"TomoSubStacks": substacks})
+
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
         errors = self._validateBase()
@@ -296,3 +304,9 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             nrefs = int(f.readline().split(":")[-1])
 
         return nrefs
+
+    def getNumParts(self):
+        if self.doContinue:
+            return self.inputSubstacks.get().getSize()
+        else:
+            return self.inputSetOfSubTomograms.get().getSize()
