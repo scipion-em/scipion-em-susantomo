@@ -71,7 +71,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       important=True,
                       allowsNull=True,
                       pointerClass='AverageSubTomogram, Volume',
-                      label="Input references.")
+                      label="Input references")
         form.addParam('inputMasks', params.MultiPointerParam,
                       condition="not reuseRefs",
                       important=True,

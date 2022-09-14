@@ -78,4 +78,5 @@ Protocols
 References
 -----------
 
-1. Sánchez RM, Mester R, Kudryashev M, Fast Cross Correlation for Limited Angle Tomographic Data. In: Felsberg M., Forssén PE., Sintorn IM., Unger J. (eds) Image Analysis. SCIA 2019. Lecture Notes in Computer Science, vol 11482. Doi: 10.23919/EUSIPCO.2019.8903041
+1. Sánchez RM, Mester R, Kudryashev M, Fast Cross Correlation for Limited Angle Tomographic Data. In: Felsberg M., Forssén PE., Sintorn IM., Unger J. (eds) Image Analysis. SCIA 2019. Lecture Notes in Computer Science, vol 11482. Doi: 10.1007/978-3-030-20205-7_34
+2. R.M. Sánchez, R. Mester and M. Kudryashev. Fast Alignment of Limited Angle Tomograms by projected Cross Correlation. 2019 27th European Signal Processing Conference (EUSIPCO), 2019, pp. 1-5, doi: 10.23919/EUSIPCO.2019.8903041
