@@ -49,8 +49,41 @@ class ProtSusanBase(EMProtocol):
 
     def __init__(self, **args):
         EMProtocol.__init__(self, **args)
+
+    def _initialize(self):
+        """ This function is meant to be called after the
+        working dir for the protocol have been set
+        (maybe after recovery from mapper)
+        """
         (self.stacks, self.tilts, self.ids,
          self.refs, self.masks) = [], [], [], [], []
+        self._createFilenameTemplates()
+        self._createIterTemplates()
+
+    def _createFilenameTemplates(self):
+        """ Centralize how files are called. """
+        iterDir = self._getExtraPath("mra/ite_%(iter)04d")
+        inputDir = self._getExtraPath("input")
+
+        self._updateFilenamesDict({
+            'input_ptcls': inputDir + '/input_particles.ptclsraw',
+            'input_refs': inputDir + '/input_refs.refstxt',
+            'input_tomos': inputDir + '/input_tomos.tomostxt',
+            'ptcls': iterDir + '/particles.ptclsraw',
+            'refs': iterDir + '/reference.refstxt',
+            'outvol': iterDir + '/map_class%(ref3d)03d.mrc',
+            'outvol_half1': iterDir + '/map_class%(ref3d)03d_half1.mrc',
+            'outvol_half2': iterDir + '/map_class%(ref3d)03d_half2.mrc',
+            'outavg': self._getExtraPath('average_class%(ref3d)03d.mrc'),
+            'outavg_half1': self._getExtraPath('average_class%(ref3d)03d_half1.mrc'),
+            'outavg_half2': self._getExtraPath('average_class%(ref3d)03d_half2.mrc'),
+            'info': self._getExtraPath('mra/info.pkl')
+        })
+
+    def _createIterTemplates(self):
+        """ Setup the regex on how to find iterations. """
+        self._iterTemplate = self._getFileName('ptcls', iter=0).replace('0000', '????')
+        self._iterRegex = re.compile('ite_(\d{4})')
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
@@ -136,6 +169,7 @@ class ProtSusanBase(EMProtocol):
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
+        self._initialize()
         pwutils.makePath(self._getExtraPath("input"))
         if self.isContinue():
             self._insertFunctionStep(self.continueStep)
@@ -146,9 +180,7 @@ class ProtSusanBase(EMProtocol):
     # --------------------------- STEPS functions -----------------------------
     def continueStep(self):
         """ Copy the ptclsraw from the previous run. """
-        prevRun = self.previousRun.get()
-        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
-        prevPtcls = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/particles.ptclsraw")
+        prevPtcls = self.inputSubstacks.get().getFileName()
         self.info(f"Copying particles from the previous run: {prevPtcls}")
         pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
@@ -227,8 +259,8 @@ class ProtSusanBase(EMProtocol):
     def _validateBase(self):
         """ Should be re-defined in subclasses. """
         errors = []
-        if self.doContinue and not self.previousRun.hasValue():
-            errors.append("Please input the previous protocol run.")
+        if self.doContinue and not self.inputSubstacks.hasValue():
+            errors.append("Please input the tomo substacks")
 
         if self.doCtf() and isinstance(self.inputTiltSeries.get(),
                                        SetOfTiltSeries):
@@ -272,13 +304,19 @@ class ProtSusanBase(EMProtocol):
         """ Should be re-defined in subclasses. """
         return self.doContinue
 
-    def getIterNumber(self, path):
+    def _getIterNumber(self, index):
         """ Return the last iteration number. """
         result = None
-        files = sorted(glob(path))
+        files = sorted(glob(self._iterTemplate))
         if files:
-            f = files[-1]
-            s = re.compile('ite_(\d{4})').search(f)
+            f = files[index]
+            s = self._iterRegex.search(f)
             if s:
-                result = int(s.group(1))  # group 1 is 1 digit iteration number
+                result = int(s.group(1))  # group 1 is 4 digit iteration number
         return result
+
+    def _lastIter(self):
+        return self._getIterNumber(-1)
+
+    def _firstIter(self):
+        return self._getIterNumber(0)

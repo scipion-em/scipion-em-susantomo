@@ -33,6 +33,7 @@ inside its conda environment.
 import os
 import sys
 import json
+import pickle
 
 import susan as SUSAN
 
@@ -64,6 +65,8 @@ def runAlignment(params, doContinue=False):
     inc_lp = params['inc_lowpass']
     lp = params['low']
     n_refs = params['refs_nums']
+    fsc = {}
+    cc = {}
 
     for i in range(1, params['iter'] + 1):
         mngr.aligner.bandpass.lowpass = lp
@@ -75,6 +78,17 @@ def runAlignment(params, doContinue=False):
         else:
             # Enforce a gradual increase in the lowpass
             lp = min(lp + 2, bp)
+        # save FSC and CC
+        for n in range(1, n_refs+1):
+            if n not in fsc:
+                fsc[n] = [mngr.get_fsc(ite=i, ref=n)]
+                cc[n] = [mngr.get_cc(ite=i, ref=n)]
+            else:
+                fsc[n].append(mngr.get_fsc(ite=i, ref=n))
+                cc[n].append(mngr.get_cc(ite=i, ref=n))
+
+        with open('mra/info.pkl', 'wb') as f:
+            pickle.dump([fsc, cc], f)
 
 
 def reconstructAvg(params):

@@ -31,7 +31,7 @@ from enum import Enum
 from pyworkflow.constants import BETA
 import pyworkflow.protocol.params as params
 
-from tomo.objects import SetOfTiltSeries, AverageSubTomogram
+from tomo.objects import AverageSubTomogram
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
@@ -60,12 +60,12 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
                            "to provide tilt-series. "
                            "They can have a different binning compared to "
                            "the previous run.")
-        form.addParam('previousRun', params.PointerParam,
-                      pointerClass="ProtSusanMRA",
+        form.addParam('inputSubstacks', params.PointerParam,
+                      pointerClass="TomoSubStacks",
                       important=True,
                       allowsNull=True,
                       condition="doContinue",
-                      label="Select previous MRA run")
+                      label="Substacks from the previous run")
 
     # --------------------------- STEPS functions -----------------------------
     def runSusanStep(self):
@@ -106,15 +106,18 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def createOutputStep(self):
         imgSet = self._getInputTs()
         volume = AverageSubTomogram()
-        volumeFile = self._getExtraPath("average_class001.mrc")
+        volumeFile = self._getFileName("outavg", ref3d=1)
         volume.setFileName(volumeFile)
         volume.setSamplingRate(imgSet.getSamplingRate())
         if self.doHalfSets:
-            volume.setHalfMaps([self._getExtraPath("average_class001_half1.mrc"),
-                                self._getExtraPath("average_class001_half2.mrc")])
+            volume.setHalfMaps([self._getFileName("outavg_half1", ref3d=1),
+                                self._getFileName("outavg_half1", ref3d=1)])
 
         self._defineOutputs(**{outputs.outputAverage.name: volume})
         self._defineSourceRelation(self._getInputTs(pointer=True), volume)
+
+        if self.doContinue:
+            self._defineSourceRelation(self.inputSubstacks, volume)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -126,9 +129,15 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
         summary = []
 
         if hasattr(self, outputs.outputAverage.name):
-            summary.append("Computed a 3D average using input subtomograms.")
+            vol = getattr(self, outputs.outputAverage.name)
+            summary.append(f"Computed an average subtomogram "
+                           f"({vol.getXDim()} px box) using "
+                           f"the tilt-series stack ({vol.getSamplingRate()} "
+                           "A/px)")
         else:
             summary.append("Output is not ready")
+
+        return summary
 
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):

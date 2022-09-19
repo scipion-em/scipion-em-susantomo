@@ -26,18 +26,19 @@
 
 from pwem.wizards.wizard import EmWizard
 
-from .protocols import ProtSusanMRA
+from .protocols import ProtSusanMRA, ProtSusanAverage
 
 
 class SusanBoxSizeWizard(EmWizard):
-    _targets = [(ProtSusanMRA, ['boxSize', 'tomoSize'])]
+    _targets = [(ProtSusanMRA, ['boxSize', 'tomoSize']),
+                (ProtSusanAverage, ['boxSize', 'tomoSize'])]
 
     def show(self, form, *params):
         prot = form.protocol
-        inputCoords = prot.inputSetOfCoords3D.get()
+        inputCoords = prot.inputSetOfSubTomograms.get().getCoordinates3D()
 
         if not inputCoords:
-            print('You must specify input 3D coordinates')
+            print('You must specify input subtomograms')
             return
 
         box = inputCoords.getBoxSize()

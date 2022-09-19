@@ -47,7 +47,8 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     _label = 'multi-reference alignment'
     _devStatus = BETA
     _possibleOutputs = {'outputAverage': AverageSubTomogram,
-                        'outputAverages': SetOfAverageSubTomograms}
+                        'outputAverages': SetOfAverageSubTomograms,
+                        'outputSubstacks': TomoSubStacks}
 
     def __init__(self, **args):
         ProtSusanBase.__init__(self, **args)
@@ -64,7 +65,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="CTF correction method (aligner)")
 
         form.addSection(label='References')
-        form.addParam('reuseRefs', params.BooleanParam, default=True,
+        form.addParam('reuseRefs', params.BooleanParam, default=False,
                       condition='doContinue',
                       label="Re-use references and masks from the previous run?")
         form.addParam('inputRefs', params.MultiPointerParam,
@@ -167,7 +168,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
         else:
             # replace relative paths with absolute
-            prevRunDir = self.previousRun.get()._getExtraPath("mra")
+            prevRunDir = self.inputSubstacks.get()._getExtraPath("mra")
             refsFn = self._getExtraPath("input/input_refs.refstxt")
             with fileinput.input(refsFn, inplace=True) as fn:
                 for line in fn:
@@ -183,7 +184,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         self.params = {
             'continue': bool(self.doContinue),
             'reuse_refs': bool(self.reuseRefs),
-            'refs_nums': len(self.refs) if not self.reuseRefs else self.getOldNumRefs(),
+            'refs_nums': self.getNumRefs(),
             'ts_nums': self.ids,
             'num_tilts': max([ts.getSize() for ts in tsSet.iterItems()]),
             'pix_size': tsSet.getSamplingRate(),
@@ -228,17 +229,17 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
     def createOutputStep(self):
         pixSize = self._getInputTs().getSamplingRate()
-        nRefs = self.params['refs_nums']
+        nRefs = self.getNumRefs()
         volume = AverageSubTomogram()
 
         def _createVolume(ind):
-            volumeFile = self._getExtraPath(f"average_class{ind:03d}.mrc")
+            volumeFile = self._getFileName("outavg", ref3d=ind)
             volume.setObjId(None)
             volume.setFileName(volumeFile)
             volume.setSamplingRate(pixSize)
             if self.doHalfSets:
-                volume.setHalfMaps([self._getExtraPath(f"average_class{ind:03d}_half1.mrc"),
-                                    self._getExtraPath(f"average_class{ind:03d}_half2.mrc")])
+                volume.setHalfMaps([self._getFileName("outavg_half1", ref3d=ind),
+                                    self._getFileName("outavg_half2", ref3d=ind)])
             return volume
 
         if nRefs > 1:
@@ -254,12 +255,11 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         self._defineOutputs(**{f"outputAverage{'s' if nRefs > 1 else ''}": volumes})
         self._defineSourceRelation(self._getInputTs(pointer=True), volumes)
 
-        lastIter = self.getIterNumber(self._getExtraPath("mra/ite_*"))
-        stacksFn = f"mra/ite_{lastIter:04d}/particles.ptclsraw"
-        numParts = self.getNumParts()
-        substacks = TomoSubStacks(filename=self._getExtraPath(stacksFn),
-                                  n_ptcl=numParts, n_refs=nRefs)
-        self._defineOutputs({"TomoSubStacks": substacks})
+        substacks = TomoSubStacks(filename=self._getFileName("ptcls",
+                                                             iter=self._lastIter()),
+                                  n_ptcl=self.getNumParts(),
+                                  n_refs=nRefs)
+        self._defineOutputs(**{"outputSubstacks": substacks})
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -295,18 +295,17 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()
 
-    def getOldNumRefs(self):
-        prevRun = self.previousRun.get()
-        lastIter = self.getIterNumber(prevRun._getExtraPath("mra/ite_*"))
-        prevRefs = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/reference.refstxt")
-
-        with open(prevRefs) as f:
-            nrefs = int(f.readline().split(":")[-1])
-
-        return nrefs
-
     def getNumParts(self):
         if self.doContinue:
             return self.inputSubstacks.get().getSize()
         else:
             return self.inputSetOfSubTomograms.get().getSize()
+
+    def getNumRefs(self):
+        if self.doContinue:
+            if self.reuseRefs:
+                return int(self.inputSubstacks.get().getNumRefs())
+            else:
+                return len(self.inputRefs)
+        else:
+            return len(self.inputRefs)
