@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
@@ -24,7 +25,40 @@
 # *
 # **************************************************************************
 
-from .protocol_estimate_ctf import ProtSusanEstimateCtf
-from .protocol_average import ProtSusanAverage
-from .protocol_mra import ProtSusanMRA
-from .protocol_subset import ProtSusanSubset
+"""
+This script should be launched using the SUSAN python interpreter
+inside its conda environment.
+"""
+
+import os
+import sys
+import json
+
+import susan as SUSAN
+
+
+def createSubsets(params):
+    parts = SUSAN.data.Particles(filename=params['input_parts'])
+
+    if params['select_refs']:
+        for ref in params['refs_list']:
+            parts = SUSAN.data.Particles.MRA.select_ref(parts, ref-1)
+
+    if params['do_thr_cc']:
+        parts = parts.select(params['cc_min'] < parts.ali_cc[0] < params['cc_max'])
+
+    parts.save('particles.ptclsraw')
+
+
+if __name__ == '__main__':
+    if len(sys.argv) > 0:
+        inputJson = sys.argv[1]
+
+        if os.path.exists(inputJson):
+            with open(inputJson) as fn:
+                params = json.load(fn)
+            createSubsets(params)
+        else:
+            raise FileNotFoundError(inputJson)
+    else:
+        print("Usage: %s jsonParamsFile" % os.path.basename(sys.argv[0]))
