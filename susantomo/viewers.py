@@ -217,7 +217,10 @@ class MRAViewer(EmProtocolViewer):
                               addButton=True)
         fscSet = self.protocol._createSetOfFSCs()
         pixSize = self.protocol._getInputTs().getSamplingRate()
-        with open(self.protocol._getFileName("info"), "rb") as fn:
+        fn = self.protocol._getFileName("info")
+        if not os.path.exists(fn):
+            self._errors.append(f"File {fn} does not exist.")
+        with open(fn, "rb") as fn:
             frc = pickle.load(fn)[0]
             for it in self._iterations:
                 fsc = self._plotFSC(frc, it, pix=pixSize, ref3d=1)
@@ -238,6 +241,8 @@ class MRAViewer(EmProtocolViewer):
     def _showCC(self, param=None):
         fn = self.protocol._getFileName('info')
         result = []
+        if not os.path.exists(fn):
+            self._errors.append(f"File {fn} does not exist.")
         with open(fn, "rb") as fn:
             cc = pickle.load(fn)[1]
             for ref3d in self._refsList:
@@ -276,9 +281,9 @@ class MRAViewer(EmProtocolViewer):
                     if os.path.exists(volFn):
                         vols.append(volFn)
                     else:
-                        raise Exception(f"Volume {volFn} does not exists.\n"
-                                        "Please select a valid iteration "
-                                        "number.")
+                        self._errors.append(f"Volume {volFn} does not exist.\n"
+                                            "Please select a valid iteration "
+                                            "number.")
         return vols
 
     def _load(self):

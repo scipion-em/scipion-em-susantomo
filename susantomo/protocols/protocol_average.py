@@ -26,27 +26,23 @@
 
 import json
 import os.path
-from enum import Enum
 
 from pyworkflow.constants import BETA
 import pyworkflow.protocol.params as params
 
-from tomo.objects import AverageSubTomogram
+from tomo.objects import AverageSubTomogram, SetOfAverageSubTomograms
 from tomo.protocols.protocol_base import ProtTomoSubtomogramAveraging
 
 from .. import Plugin
 from .protocol_base import ProtSusanBase
 
 
-class outputs(Enum):
-    outputAverage = AverageSubTomogram
-
-
 class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     """ Average and reconstruct a 3D volume (subtomogram average). """
     _label = 'average and reconstruct'
     _devStatus = BETA
-    _possibleOutputs = outputs
+    _possibleOutputs = {'outputAverage': AverageSubTomogram,
+                        'outputAverages': SetOfAverageSubTomograms}
 
     def __init__(self, **args):
         ProtSusanBase.__init__(self, **args)
@@ -104,20 +100,35 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
                     cwd=self._getExtraPath())
 
     def createOutputStep(self):
-        imgSet = self._getInputTs()
+        pixSize = self._getInputTs().getSamplingRate()
+        nrefs = self.getNumRefs()
         volume = AverageSubTomogram()
-        volumeFile = self._getFileName("outavg", ref3d=1)
-        volume.setFileName(volumeFile)
-        volume.setSamplingRate(imgSet.getSamplingRate())
-        if self.doHalfSets:
-            volume.setHalfMaps([self._getFileName("outavg_half1", ref3d=1),
-                                self._getFileName("outavg_half1", ref3d=1)])
 
-        self._defineOutputs(**{outputs.outputAverage.name: volume})
-        self._defineSourceRelation(self._getInputTs(pointer=True), volume)
+        def _createVolume(ind):
+            volumeFile = self._getFileName("outavg", ref3d=ind)
+            volume.setObjId(None)
+            volume.setFileName(volumeFile)
+            volume.setSamplingRate(pixSize)
+            if self.doHalfSets:
+                volume.setHalfMaps([self._getFileName("outavg_half1", ref3d=ind),
+                                    self._getFileName("outavg_half2", ref3d=ind)])
+            return volume
+
+        if nrefs > 1:
+            volumes = self._createSetOfAverageSubTomograms()
+            volumes.setSamplingRate(pixSize)
+            for i in range(nrefs):
+                volume = _createVolume(i + 1)
+                volume.setClassId(i + 1)
+                volumes.append(volume)
+        else:
+            volumes = _createVolume(1)
+
+        self._defineOutputs(**{self.getOutputName(nrefs): volumes})
+        self._defineSourceRelation(self._getInputTs(pointer=True), volumes)
 
         if self.doContinue:
-            self._defineSourceRelation(self.inputSubstacks, volume)
+            self._defineSourceRelation(self.inputSubstacks, volumes)
 
     # --------------------------- INFO functions ------------------------------
     def _validate(self):
@@ -128,12 +139,11 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     def _summary(self):
         summary = []
 
-        if hasattr(self, outputs.outputAverage.name):
-            vol = getattr(self, outputs.outputAverage.name)
-            summary.append(f"Computed an average subtomogram "
-                           f"({vol.getXDim()} px box) using "
-                           f"the tilt-series stack ({vol.getSamplingRate()} "
-                           "A/px)")
+        output = self.getOutputName(self.getNumRefs())
+        if hasattr(self, output):
+            msg = "Computed average subtomogram(s) using the tilt-series "
+            msg += "substacks" if self.doContinue else "stacks"
+            summary.append(msg)
         else:
             summary.append("Output is not ready")
 
@@ -142,3 +152,9 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get()
+
+    def getNumRefs(self):
+        return int(self.inputSubstacks.get().getNumRefs()) if self.doContinue else 1
+
+    def getOutputName(self, nrefs):
+        return f"outputAverage{'s' if nrefs > 1 else ''}"

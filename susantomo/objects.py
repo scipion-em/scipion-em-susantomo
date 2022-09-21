@@ -48,4 +48,4 @@ class TomoSubStacks(EMObject):
         return self.n_ptcl.get()
 
     def getFileName(self):
-        return self.filename
+        return self.filename.get()
