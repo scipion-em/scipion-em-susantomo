@@ -25,6 +25,7 @@
 # **************************************************************************
 import pickle
 import os
+import numpy as np
 from matplotlib.figure import Figure
 
 import pyworkflow.protocol.params as params
@@ -76,6 +77,17 @@ class CtfEstimationTomoViewerSusan(CtfEstimationTomoViewer):
         psdPlot.imshow(img.getData(), cmap='gray')
 
         return fig
+
+
+def protected_show(showFunc):
+    def protectedShowFunc(self, paramName=None):
+        try:
+            return showFunc(self, paramName=paramName)
+        except Exception as e:
+            self._errors = [str(e)]
+            return self._showErrors()
+
+    return protectedShowFunc
 
 
 class MRAViewer(EmProtocolViewer):
@@ -170,6 +182,7 @@ class MRAViewer(EmProtocolViewer):
         return views
 
     # --------- Show volumes --------------------------------------------------
+    @protected_show
     def _showVolumes(self, paramName=None):
         try:
             if self.displayVol == VOLUME_CHIMERA:
@@ -208,6 +221,7 @@ class MRAViewer(EmProtocolViewer):
         return [ObjectView(self._project, prot.strId(), path)]
 
     # -------------------------- show FSC -------------------------------------
+    @protected_show
     def _showFSC(self, paramName=None):
         threshold = self.resolutionThresholdFSC.get()
         fscViewer = FscViewer(project=self.protocol.getProject(),
@@ -219,42 +233,49 @@ class MRAViewer(EmProtocolViewer):
         pixSize = self.protocol._getInputTs().getSamplingRate()
         fn = self.protocol._getFileName("info")
         if not os.path.exists(fn):
-            self._errors.append(f"File {fn} does not exist.")
+            raise FileNotFoundError(f"File {fn} does not exist.")
         with open(fn, "rb") as fn:
             frc = pickle.load(fn)[0]
             for it in self._iterations:
-                fsc = self._plotFSC(frc, it, pix=pixSize, ref3d=1)
-                fscSet.append(fsc)
+                for ref3d in self._refsList:
+                    fsc = self._plotFSC(frc, it, pix=pixSize, ref3d=ref3d)
+                    fscSet.append(fsc)
         fscViewer.visualize(fscSet)
         return [fscViewer]
 
     def _plotFSC(self, frc, iter, pix=1.0, ref3d=1):
-        frc = frc[ref3d][iter-1].tolist()  # iters are 0-indexed
-        nqfp = len(frc)  # half-box size in px
-        resolution_inv = [fpix/(2*pix*(nqfp-1)) for fpix in range(1, nqfp+1)]
-        fsc = FSC(objLabel=f"iter {iter}")
-        fsc.setData(resolution_inv, frc)
+        print(f"Loading FSC for iteration {iter}, reference {ref3d}")
+        frc = frc[ref3d][iter-1]  # iters are 0-indexed
+        resolution_inv = [fpix/(2*pix*(frc.size-1)) for fpix in range(frc.size)]
+        fsc = FSC(objLabel=f"iter {iter} ref{ref3d}")
+        fsc.setData(resolution_inv, frc.tolist())
 
         return fsc
 
     # ----------------------------- Show CC -----------------------------------
-    def _showCC(self, param=None):
+    @protected_show
+    def _showCC(self, paramName=None):
         fn = self.protocol._getFileName('info')
         result = []
         if not os.path.exists(fn):
-            self._errors.append(f"File {fn} does not exist.")
+            raise FileNotFoundError(f"File {fn} does not exist.")
         with open(fn, "rb") as fn:
             cc = pickle.load(fn)[1]
             for ref3d in self._refsList:
                 lastIter = len(cc[ref3d])
+                print(f"Loading CC for iteration {lastIter}, reference {ref3d}")
                 result.append(cc[ref3d][lastIter-1].tolist())
 
         numberOfBins = self.nBins.get()
         plotter = EmPlotter()
         plotter.createSubPlot(f"Cross-correlation (iter {lastIter})",
                               "CC", "Number of particles")
-        for r in result:
-            plotter.plotHist(r, nbins=numberOfBins)
+
+        cmap = get_cmap(len(result))
+        for i, r in enumerate(result):
+            plotter.plotHist(r, nbins=numberOfBins, color=cmap(i))
+
+        plotter.showLegend([f"ref {ref3d}" for ref3d in self._refsList], loc='upper right')
         plotter.show()
 
         return [plotter]
@@ -281,9 +302,11 @@ class MRAViewer(EmProtocolViewer):
                     if os.path.exists(volFn):
                         vols.append(volFn)
                     else:
-                        self._errors.append(f"Volume {volFn} does not exist.\n"
-                                            "Please select a valid iteration "
-                                            "number.")
+                        raise FileNotFoundError(f"Volume {volFn} does not exist.\n"
+                                                "Please select a valid iteration "
+                                                "number.")
+        print(f"Displaying volumes: {vols}")
+
         return vols
 
     def _load(self):
@@ -299,7 +322,7 @@ class MRAViewer(EmProtocolViewer):
 
         prot._initialize()  # Load filename templates
 
-        if self.viewIter.get() == ITER_LAST or self.showHalves == 3:
+        if self.viewIter.get() == ITER_LAST:
             self._iterations = [prot._lastIter()]
         else:
             self._iterations = self._getRange(self.iterSelection, 'iterations')
@@ -318,3 +341,17 @@ class MRAViewer(EmProtocolViewer):
             result = self._getListFromRangeString(value)
 
         return result
+
+
+def get_cmap(N):
+    import matplotlib.cm as cmx
+    import matplotlib.colors as colors
+    """Returns a function that maps each index in 0, 1, ... N-1 to a distinct
+    RGB color."""
+    color_norm = colors.Normalize(vmin=0, vmax=N)  # -1)
+    scalar_map = cmx.ScalarMappable(norm=color_norm, cmap='hsv')
+
+    def map_index_to_rgb_color(ind):
+        return scalar_map.to_rgba(ind)
+
+    return map_index_to_rgb_color

@@ -286,11 +286,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
         return errors
 
-    def _summary(self):
-        summary = []
-
-        return summary
-
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get() or self.ctfCorrAln.get()

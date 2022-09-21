@@ -136,25 +136,6 @@ class ProtSusanAverage(ProtSusanBase, ProtTomoSubtomogramAveraging):
 
         return errors
 
-    def _summary(self):
-        summary = []
-
-        output = self.getOutputName(self.getNumRefs())
-        if hasattr(self, output):
-            msg = "Computed average subtomogram(s) using the tilt-series "
-            msg += "substacks" if self.doContinue else "stacks"
-            summary.append(msg)
-        else:
-            summary.append("Output is not ready")
-
-        return summary
-
     # --------------------------- UTILS functions -----------------------------
     def doCtf(self):
         return self.ctfCorrAvg.get()
-
-    def getNumRefs(self):
-        return int(self.inputSubstacks.get().getNumRefs()) if self.doContinue else 1
-
-    def getOutputName(self, nrefs):
-        return f"outputAverage{'s' if nrefs > 1 else ''}"

@@ -270,8 +270,17 @@ class ProtSusanBase(EMProtocol):
         return errors
 
     def _summary(self):
-        """ Should be re-defined in subclasses. """
-        return []
+        summary = []
+
+        output = self.getOutputName(self.getNumRefs())
+        if hasattr(self, output):
+            msg = "Computed average subtomogram(s) using the tilt-series "
+            msg += "substacks" if self.doContinue else "stacks"
+            summary.append(msg)
+        else:
+            summary.append("Output is not ready")
+
+        return summary
 
     # --------------------------- UTILS functions -----------------------------
     def convertInputRefs(self):
@@ -303,6 +312,12 @@ class ProtSusanBase(EMProtocol):
     def isContinue(self):
         """ Should be re-defined in subclasses. """
         return self.doContinue
+
+    def getNumRefs(self):
+        return int(self.inputSubstacks.get().getNumRefs()) if self.doContinue else 1
+
+    def getOutputName(self, nrefs):
+        return f"outputAverage{'s' if nrefs > 1 else ''}"
 
     def _getIterNumber(self, index):
         """ Return the last iteration number. """
