@@ -30,6 +30,7 @@ from matplotlib.figure import Figure
 
 import pyworkflow.protocol.params as params
 from pyworkflow.viewer import DESKTOP_TKINTER
+import pyworkflow.utils as pwutils
 from pwem.emlib.image import ImageHandler
 from pwem.objects import FSC
 from pwem.viewers import EmPlotter
@@ -338,7 +339,7 @@ class MRAViewer(EmProtocolViewer):
             self._errors.append(f'Provide {label} selection.')
             result = []
         else:
-            result = self._getListFromRangeString(value)
+            result = pwutils.getListFromRangeString(value)
 
         return result
 

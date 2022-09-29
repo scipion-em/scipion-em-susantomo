@@ -196,7 +196,7 @@ class ProtSusanBase(EMProtocol):
         if not self.isContinue():
             inputSubTomos = self.inputSetOfSubTomograms.get()
             scaleCoords = self.getScaleCoords()
-            if abs(scaleCoords - 1.0 > 0.00001):
+            if abs(scaleCoords - 1.0) > 0.00001:
                 self.info(f"Scaling coordinates by a factor of {scaleCoords:0.2f}")
 
             tsSet = self._getInputTs()
