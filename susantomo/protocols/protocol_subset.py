@@ -30,7 +30,7 @@ import os
 import json
 
 import pyworkflow.protocol.params as params
-from pyworkflow.utils import getListFromValues
+from pyworkflow.utils import getListFromRangeString
 from pyworkflow.constants import BETA
 
 from .. import Plugin
@@ -40,7 +40,7 @@ from .protocol_base import ProtSusanBase
 
 class ProtSusanSubset(ProtSusanBase):
     """ Create a subset of tomo substacks. """
-    _label = 'multi-reference alignment'
+    _label = 'create a subset'
     _devStatus = BETA
     _possibleOutputs = {'outputSubstacks': TomoSubStacks}
 
@@ -87,7 +87,7 @@ class ProtSusanSubset(ProtSusanBase):
             'cc_max': self.highCC.get(),
             'select_refs': bool(self.selectRefs),
             'do_thr_cc': bool(self.doThreshold),
-            'refs_list': getListFromValues(self.refsList.get())
+            'refs_list': getListFromRangeString(self.refsList.get())
         }
 
         jsonFn = self._getTmpPath("params.json")
@@ -96,12 +96,12 @@ class ProtSusanSubset(ProtSusanBase):
 
         self.runJob(Plugin.getProgram("subsets.py"),
                     os.path.abspath(jsonFn),
-                    env=Plugin.getEnviron(), cwd=self._getExtraPath())
+                    env=Plugin.getEnviron(),
+                    cwd=self._getExtraPath())
 
-        nRefs = self.getNumRefs()
         substacks = TomoSubStacks(filename=self._getExtraPath("particles.ptclsraw"),
                                   n_ptcl=self.getNumParts(),
-                                  n_refs=nRefs)
+                                  n_refs=self.getNumRefs())
         self._defineOutputs(**{"outputSubstacks": substacks})
 
     # --------------------------- INFO functions ------------------------------
@@ -113,7 +113,11 @@ class ProtSusanSubset(ProtSusanBase):
 
         if self.selectRefs:
             origRefs = range(1, self.inputSubstacks.get().getNumRefs()+1)
-            keepRefs = getListFromValues(self.refsList.get())
+            keepRefs = getListFromRangeString(self.refsList.get())
+            if not set(keepRefs).issubset(set(origRefs)):
+                errors.append("Selected references must be a "
+                              "subset of input references: "
+                              f"{origRefs}")
 
         return errors
 
@@ -122,4 +126,4 @@ class ProtSusanSubset(ProtSusanBase):
         if not self.selectRefs:
             return int(self.inputSubstacks.get().getNumRefs())
         else:
-            return len(getListFromValues(self.refsList.get()))
+            return len(getListFromRangeString(self.refsList.get()))

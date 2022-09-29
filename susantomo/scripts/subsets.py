@@ -58,7 +58,7 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-            createSubsets(params)
+                createSubsets(params)
         else:
             raise FileNotFoundError(inputJson)
     else:
