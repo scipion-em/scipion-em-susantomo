@@ -49,6 +49,7 @@ class ProtSusanSubset(ProtSusanBase):
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):
+        form.addSection(label='Input')
         form.addHidden('doContinue', params.BooleanParam, default=False)
         form.addParam('inputSubstacks', params.PointerParam,
                       pointerClass="TomoSubStacks",
@@ -58,25 +59,26 @@ class ProtSusanSubset(ProtSusanBase):
         form.addParam('selectRefs', params.BooleanParam, default=False,
                       label="Filter by MRA references")
         form.addParam('refsList', params.NumericRangeParam,
-                      condition="selectRef",
-                      label="References numbers list",
+                      condition="selectRefs",
+                      label="References to keep",
                       help="Provide a list of references (separated by space) "
                            "you would like to keep. "
-                           "The first reference number is 1.")
+                           "*The first reference number is 1.*")
 
         form.addParam('doThreshold', params.BooleanParam,
-                      default=False)
+                      label="Filter by cross-correlation",
+                      default=False,
+                      help="Filtering by CC is done after filtering by reference.")
         line = form.addLine("CC range (0-1)", condition="doThreshold")
-        line.addParam('lowCC', params.IntParam,
+        line.addParam('lowCC', params.FloatParam,
                       condition="doThreshold",
-                      label='Low limit', default=0)
-        line.addParam('highCC', params.IntParam,
+                      label='Low limit', default=0.)
+        line.addParam('highCC', params.FloatParam,
                       condition="doThreshold",
-                      label='High limit', default=1)
+                      label='High limit', default=1.)
 
     # --------------------------- INSERT steps functions ----------------------
     def _insertAllSteps(self):
-        self._initialize()
         self._insertFunctionStep(self.createOutputStep)
 
     # --------------------------- STEPS functions -----------------------------
@@ -99,8 +101,15 @@ class ProtSusanSubset(ProtSusanBase):
                     env=Plugin.getEnviron(),
                     cwd=self._getExtraPath())
 
+        n_ptcl = 0
+        with open(self.getLogPaths()[0]) as f:
+            for line in f.readlines():
+                if "Remaining particles: " in line:
+                    n_ptcl = int(line.split()[-1])
+                    break
+
         substacks = TomoSubStacks(filename=self._getExtraPath("particles.ptclsraw"),
-                                  n_ptcl=self.getNumParts(),
+                                  n_ptcl=n_ptcl,
                                   n_refs=self.getNumRefs())
         self._defineOutputs(**{"outputSubstacks": substacks})
 
@@ -112,14 +121,24 @@ class ProtSusanSubset(ProtSusanBase):
             errors.append("You did not choose any operation!")
 
         if self.selectRefs:
-            origRefs = range(1, self.inputSubstacks.get().getNumRefs()+1)
+            origRefs = list(range(1, self.inputSubstacks.get().getNumRefs()+1))
             keepRefs = getListFromRangeString(self.refsList.get())
             if not set(keepRefs).issubset(set(origRefs)):
-                errors.append("Selected references must be a "
-                              "subset of input references: "
+                errors.append(f"Selected references {keepRefs} must be a "
+                              f"subset of input references: "
                               f"{origRefs}")
 
         return errors
+
+    def _summary(self):
+        summary = []
+
+        if hasattr(self, "outputSubstacks"):
+            summary.append("Created a subset from input substacks")
+        else:
+            summary.append("Output is not ready")
+
+        return summary
 
     # --------------------------- UTILS functions -----------------------------
     def getNumRefs(self):

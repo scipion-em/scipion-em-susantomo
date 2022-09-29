@@ -33,22 +33,33 @@ inside its conda environment.
 import os
 import sys
 import json
+import numpy as np
 
 import susan as SUSAN
 
 
 def createSubsets(params):
     parts = SUSAN.data.Particles(filename=params['input_parts'])
+    results = [parts]
 
     if params['select_refs']:
         for ref in params['refs_list']:
-            parts = SUSAN.data.Particles.MRA.select_ref(parts, ref-1)
+            res = SUSAN.data.Particles.MRA.select_ref(results[-1], ref-1)
+            results.append(res)
 
     if params['do_thr_cc']:
-        parts = parts.select(parts.ali_cc[0] > params['cc_min'])
-        parts = parts.select(parts.ali_cc[0] < params['cc_max'])
+        nrefs_remaining = results[-1].n_refs
+        for i in range(nrefs_remaining):
+            ind = np.logical_and(results[-1].ali_cc[i] > params['cc_min'],
+                                 results[-1].ali_cc[i] < params['cc_max'])
+            # check if all values are False
+            if np.all(ind == False):
+                raise Exception("CC limits are too strict, no particles match.")
+            res = results[-1].select(ind)
+            results.append(res)
 
-    parts.save('particles.ptclsraw')
+    print("Remaining particles: ", results[-1].n_ptcl)
+    results[-1].save('particles.ptclsraw')
 
 
 if __name__ == '__main__':
@@ -58,7 +69,7 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                createSubsets(params)
+            createSubsets(params)
         else:
             raise FileNotFoundError(inputJson)
     else:
