@@ -45,7 +45,8 @@ def createSubsets(params):
             parts = SUSAN.data.Particles.MRA.select_ref(parts, ref-1)
 
     if params['do_thr_cc']:
-        parts = parts.select(params['cc_min'] < parts.ali_cc[0] < params['cc_max'])
+        parts = parts.select(parts.ali_cc[0] > params['cc_min'])
+        parts = parts.select(parts.ali_cc[0] < params['cc_max'])
 
     parts.save('particles.ptclsraw')
 
