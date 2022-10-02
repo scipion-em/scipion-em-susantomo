@@ -293,7 +293,7 @@ class MRAViewer(EmProtocolViewer):
         elif halves == 2:
             keysFn = ["outvol_half1", "outvol_half2"]
         else:
-            keysFn = ["outavg"]
+            keysFn = ["outvol"]
 
         for it in self._iterations:
             for ref3d in self._refsList:

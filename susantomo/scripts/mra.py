@@ -40,7 +40,7 @@ import susan as SUSAN
 from base import *
 
 
-def runAlignment(params, doContinue=False):
+def runAlignment(params):
     """ Execute MRA project in the output_dir folder. """
     mngr = SUSAN.project.Manager('mra', box_size=params['box_size'])
     mngr.initial_reference = "input/input_refs.refstxt"
@@ -49,12 +49,16 @@ def runAlignment(params, doContinue=False):
 
     mngr.list_gpus_ids = params['gpus']
     mngr.threads_per_gpu = params['thr_per_gpu']
-    mngr.aligner.ctf_correction = params['ctf_corr_aln']
-    mngr.aligner.allow_drift = params['allow_drift']
-    mngr.averager.ctf_correction = params['ctf_corr_avg']
     mngr.cc_threshold = params['cc']
     mngr.iteration_type = 3  # 3D Alignment
 
+    mngr.averager.ctf_correction = params['ctf_corr_avg']
+    mngr.averager.rec_halfsets = params['do_halfsets']
+    mngr.averager.symmetry = params['symmetry']
+    mngr.averager.padding_type = params['padding']
+
+    mngr.aligner.ctf_correction = params['ctf_corr_aln']
+    mngr.aligner.allow_drift = params['allow_drift']
     mngr.aligner.bandpass.highpass = params['high']
     #mngr.aligner.bandpass.lowpass = params['low']
     mngr.aligner.set_angular_search(*params['angles'])
@@ -91,21 +95,6 @@ def runAlignment(params, doContinue=False):
             pickle.dump([fsc, cc], f)
 
 
-def reconstructAvg(params):
-    """ Reconstruct an average 3D volume. """
-    avgr = SUSAN.modules.Averager()
-    avgr.list_gpus_ids = params['gpus']
-    avgr.threads_per_gpu = params['thr_per_gpu']
-    avgr.ctf_correction = params['ctf_corr_avg']
-    avgr.rec_halfsets = params['do_halfsets']
-    avgr.symmetry = params['symmetry']
-    avgr.padding_type = params['padding']
-    lastIter = getIterNumber('mra/ite_*')
-    avgr.reconstruct("average", "input/input_tomos.tomostxt",
-                     f"mra/ite_{lastIter:04d}/particles.ptclsraw",
-                     box_size=params['box_size'])
-
-
 if __name__ == '__main__':
     if len(sys.argv) > 0:
         inputJson = sys.argv[1]
@@ -122,8 +111,7 @@ if __name__ == '__main__':
             if not params['continue']:
                 createPtclsFile(params, params['refs_nums'])
 
-            runAlignment(params, doContinue=params['continue'])
-            reconstructAvg(params)
+            runAlignment(params)
         else:
             raise FileNotFoundError(inputJson)
     else:

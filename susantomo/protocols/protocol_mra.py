@@ -236,13 +236,13 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         volume = AverageSubTomogram()
 
         def _createVolume(ind):
-            volumeFile = self._getFileName("outavg", ref3d=ind)
+            volumeFile = self._getFileName("outvol", ref3d=ind, iter=self._lastIter())
             volume.setObjId(None)
             volume.setFileName(volumeFile)
             volume.setSamplingRate(pixSize)
             if self.doHalfSets:
-                volume.setHalfMaps([self._getFileName("outavg_half1", ref3d=ind),
-                                    self._getFileName("outavg_half2", ref3d=ind)])
+                volume.setHalfMaps([self._getFileName("outvol_half1", ref3d=ind, iter=self._lastIter()),
+                                    self._getFileName("outvol_half2", ref3d=ind, iter=self._lastIter())])
             return volume
 
         if nRefs > 1:

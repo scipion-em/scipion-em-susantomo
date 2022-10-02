@@ -149,7 +149,7 @@ class TestSusanMRAWorkflow(TestBase):
                              "AverageSubTomogram has not been produced.")
 
         print(magentaStr("\n==> Testing susan - multi-reference alignment:"))
-        protMRA = ProtSusanMRA(tomoSize=110, boxSize=32, numberOfIters=2,
+        protMRA = ProtSusanMRA(tomoSize=110, boxSize=32, numberOfIters=1,
                                coneRange=0, coneSampling=1, inplaneRange=0,
                                inplaneSampling=1, refine=2, refineFactor=1,
                                allowDrift=True)
