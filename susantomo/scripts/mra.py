@@ -61,6 +61,7 @@ def runAlignment(params):
     mngr.aligner.ctf_correction = params['ctf_corr_aln']
     mngr.aligner.allow_drift = params['allow_drift']
     mngr.aligner.bandpass.highpass = params['high']
+    mngr.aligner.bandpass.rolloff = params['rolloff']
     mngr.aligner.set_angular_search(*params['angles'])
     mngr.aligner.refine.levels = params['refine']
     mngr.aligner.refine.factor = params['refine_factor']
@@ -86,7 +87,7 @@ def runAlignment(params):
         if n_refs > 1:
             bp = max(max(bp), 1.0)  # avoid 0.0
         if i == 1 or not inc_lp:
-            lp = bp
+            lp = params['low']  # keep const
         else:
             # Enforce a gradual increase in the lowpass
             lp = min(lp + 2, bp)

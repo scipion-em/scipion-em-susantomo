@@ -170,11 +170,13 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       help='Threshold value for CC (cross-correlation). '
                            'Determines the fraction of particles to be used '
                            'for reconstruction.')
-        line = form.addLine("Band-pass filter (freq.)")
+        line = form.addLine("Band-pass filter")
         line.addParam('low', params.IntParam,
                       label='Low frequency (px)', default=11)
         line.addParam('high', params.IntParam,
                       label='High frequency (px)', default=2)
+        form.addParam('rolloff', params.IntParam,
+                      label='Band-pass roll-off (px)', default=2)
 
     # --------------------------- STEPS functions -----------------------------
     def convertInputRefs(self):
@@ -226,6 +228,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'cc': self.threshold.get(),
             'low': self.low.get(),
             'high': self.high.get(),
+            'rolloff': self.rolloff.get(),
             'refine': self.refine.get(),
             'refine_factor': self.refineFactor.get(),
             'angles': [self.coneRange.get(), self.coneSampling.get(),
