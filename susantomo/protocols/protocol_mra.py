@@ -70,17 +70,19 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="Re-use references and masks from the previous run?")
         form.addParam('inputRefs', params.MultiPointerParam,
                       condition="not reuseRefs",
+                      minNumObjects=1,
                       important=True,
                       allowsNull=True,
-                      pointerClass='AverageSubTomogram, Volume',
+                      pointerClass='Volume',
                       label="Input references")
         form.addParam('inputMasks', params.MultiPointerParam,
                       condition="not reuseRefs",
+                      minNumObjects=1,
                       important=True,
                       allowsNull=True,
                       label="Alignment masks",
-                      pointerClass='Volume, VolumeMask',
-                      help='Need to have the same dimensions as the template. '
+                      pointerClass='Volume',
+                      help='Need to have the same dimensions as the references. '
                            'Masks order should match the references.')
 
         form.addSection(label='Angular scanning')
@@ -168,12 +170,13 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             self.masks.extend([os.path.abspath(i.get().getFileName()) for i in self.inputMasks])
         else:
             # replace relative paths with absolute
-            prevRunDir = self.inputSubstacks.get()._getExtraPath("mra")
-            refsFn = self._getExtraPath("input/input_refs.refstxt")
-            with fileinput.input(refsFn, inplace=True) as fn:
+            prevParts = self.inputSubstacks.get().getFileName()
+            prevDir = prevParts.split("mra")[0]
+            with fileinput.input(self._getFileName("input_refs"),
+                                 inplace=True) as fn:
                 for line in fn:
                     line = line.replace(":mra",
-                                        f":{os.path.abspath(prevRunDir)}")
+                                        f":{os.path.abspath(prevDir)}/mra")
                     sys.stdout.write(line)
 
     def runSusanStep(self):
@@ -271,18 +274,19 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         if self.numberOfIters.get() == 1 and self.incLowpass:
             errors.append("You cannot increase lowpass when doing only 1 iteration.")
 
-        if not refs.hasValue() or not masks.hasValue():
+        if (len(refs) == 0 or len(masks) == 0) and not self.reuseRefs:
             errors.append("Input references and masks are required!")
 
         if len(refs) != len(masks):
             errors.append("Number of references and masks must be the same.")
 
-        pix_sizes = [self._getInputTs().getSamplingRate()]
-        pix_sizes.extend([r.get().getSamplingRate() for r in refs])
-        pix_sizes.extend([m.get().getSamplingRate() for m in masks])
-        if len(set(pix_sizes)) != 1:
-            errors.append("Pixel size of input tilt-series, references and "
-                          "masks must be the same.")
+        if not self.reuseRefs:
+            pix_sizes = [self._getInputTs().getSamplingRate()]
+            pix_sizes.extend([r.get().getSamplingRate() for r in refs])
+            pix_sizes.extend([m.get().getSamplingRate() for m in masks])
+            if len(set(pix_sizes)) != 1:
+                errors.append("Pixel size of input tilt-series, references and "
+                              "masks must be the same.")
 
         return errors
 

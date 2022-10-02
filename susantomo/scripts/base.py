@@ -91,16 +91,6 @@ def createRefsFile(params, n_refs):
     refs.save("input/input_refs.refstxt")
 
 
-def generateRefs(params):
-    SUSAN.io.mrc.write(
-        SUSAN.utils.create_sphere(params['ref_size'], params['box_size']),
-        'reference.mrc', params['pix_size'])
-
-    SUSAN.io.mrc.write(
-        SUSAN.utils.create_sphere(params['mask_size'], params['box_size']),
-        'mask.mrc', params['pix_size'])
-
-
 def getIterNumber(path):
     """ Return the last iteration number. """
     result = None

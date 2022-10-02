@@ -185,7 +185,8 @@ class ProtSusanBase(EMProtocol):
         pwutils.copyFile(prevPtcls, self._getExtraPath("input/input_particles.ptclsraw"))
 
         if getattr(self, "reuseRefs", False):
-            prevRefs = prevRun._getExtraPath(f"mra/ite_{lastIter:04d}/reference.refstxt")
+            # copy refstxt file
+            prevRefs = prevPtcls.replace("particles.ptclsraw", "reference.refstxt")
             self.info(f"Copying references from the previous run: {prevRefs}")
             pwutils.copyFile(prevRefs, self._getExtraPath("input/input_refs.refstxt"))
 
