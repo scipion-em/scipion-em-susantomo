@@ -103,6 +103,13 @@ def runAlignment(params):
         with open('mra/info.pkl', 'wb') as f:
             pickle.dump([fsc, cc], f)
 
+        if params['apply_fom']:
+            # Denoise reference with FOM [Sindelar and Grigorieff, 2012]
+            m = mngr.get_names_map(i)
+            v, a = SUSAN.io.mrc.read(m)
+            v_f = SUSAN.utils.apply_FOM(v, mngr.get_fsc(i))
+            SUSAN.io.mrc.write(v_f, m, a)
+
 
 if __name__ == '__main__':
     if len(sys.argv) > 0:
