@@ -141,6 +141,21 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                            "cone_range[i+1] = refine_factor * cone_sampling[i];\n"
                            "inplane_range[i+1] = refine_factor * inplane_sampling[i];")
 
+        group = form.addGroup("Auto-refine")
+        group.addParam('autoStep', params.BooleanParam, default=False,
+                       label="Decrease the sampling on each iteration?",
+                       help="New sampling will be *np.rad2deg(np.arctan2(1, lp))* "
+                            "where lp is lowpass of previous iteration.")
+        group.addParam('rangeFactor', params.IntParam, default=4,
+                       condition="autoStep",
+                       label="Search range factor",
+                       help="Search range will become _factor*sampling_ "
+                            "calculated above")
+        group.addParam('incLowpass', params.BooleanParam, default=False,
+                       label="Increase the lowpass filter on each iteration?",
+                       help="New lowpass will be *lp[i+1] = min(lp[i]+2, bp)* "
+                            "where bp is estimated resolution of iteration i.")
+
         form.addSection(label='Shifts & thresholds')
         form.addParam('allowDrift', params.BooleanParam, default=True,
                       label="Allow drift?",
@@ -160,8 +175,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label='Low frequency (px)', default=11)
         line.addParam('high', params.IntParam,
                       label='High frequency (px)', default=2)
-        form.addParam('incLowpass', params.BooleanParam, default=False,
-                      label="Increase the lowpass filter on each iteration?")
 
     # --------------------------- STEPS functions -----------------------------
     def convertInputRefs(self):
@@ -215,10 +228,12 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'high': self.high.get(),
             'refine': self.refine.get(),
             'refine_factor': self.refineFactor.get(),
-            'inc_lowpass': bool(self.incLowpass),
             'angles': [self.coneRange.get(), self.coneSampling.get(),
                        self.inplaneRange.get(), self.inplaneSampling.get()],
             'offsets': [self.offsetRange.get(), self.offsetStep.get()],
+            'auto_step': bool(self.autoStep),
+            'range_factor': self.rangeFactor.get() if self.autoStep else 0,
+            'inc_lowpass': bool(self.incLowpass),
             'randomize': bool(self.randomizeAngles)
         }
 

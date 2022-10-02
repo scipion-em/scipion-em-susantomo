@@ -34,6 +34,7 @@ import os
 import sys
 import json
 import pickle
+import numpy as np
 
 import susan as SUSAN
 
@@ -60,19 +61,26 @@ def runAlignment(params):
     mngr.aligner.ctf_correction = params['ctf_corr_aln']
     mngr.aligner.allow_drift = params['allow_drift']
     mngr.aligner.bandpass.highpass = params['high']
-    #mngr.aligner.bandpass.lowpass = params['low']
     mngr.aligner.set_angular_search(*params['angles'])
     mngr.aligner.refine.levels = params['refine']
     mngr.aligner.refine.factor = params['refine_factor']
     mngr.aligner.set_offset_search(*params['offsets'])
 
     inc_lp = params['inc_lowpass']
+    auto = params['auto_step']
     lp = params['low']
     n_refs = params['refs_nums']
     fsc = {}
     cc = {}
 
     for i in range(1, params['iter'] + 1):
+        if auto:  # adjust angular range/step every iter
+            ang_stp = np.rad2deg(np.arctan2(1, lp))
+            ang_rng = params['range_factor'] * ang_stp
+            if i > 1:
+                mngr.aligner.set_angular_search(ang_rng, ang_stp, ang_rng, ang_stp)
+                if params['refine'] == 0:
+                    mngr.aligner.refine.levels = 1
         mngr.aligner.bandpass.lowpass = lp
         bp = mngr.execute_iteration(i)
         if n_refs > 1:
