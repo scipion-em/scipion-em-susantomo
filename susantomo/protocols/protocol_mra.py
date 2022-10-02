@@ -165,11 +165,6 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       label="Offset range (px)")
         form.addParam('offsetStep', params.IntParam, default=4,
                       label="Offset step (px)")
-        form.addParam('threshold', params.FloatParam,
-                      label='CC threshold', default=0.9,
-                      help='Threshold value for CC (cross-correlation). '
-                           'Determines the fraction of particles to be used '
-                           'for reconstruction.')
         line = form.addLine("Band-pass filter")
         line.addParam('low', params.IntParam,
                       label='Low frequency (px)', default=11)

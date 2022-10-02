@@ -145,6 +145,13 @@ class ProtSusanBase(EMProtocol):
         form.addParam('doHalfSets', params.BooleanParam, default=True,
                       label="Reconstruct half-sets?")
 
+        if self.getClassName() == "ProtSusanMRA":
+            form.addParam('threshold', params.FloatParam,
+                          label='CC threshold', default=0.9,
+                          help='Threshold value for CC (cross-correlation). '
+                               'Determines the fraction of particles to be used '
+                               'for reconstruction.')
+
         form.addParallelSection(threads=1, mpi=1)
 
     def _defineContinueParams(self, form):
