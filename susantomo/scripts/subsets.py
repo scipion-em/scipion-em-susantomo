@@ -33,31 +33,34 @@ inside its conda environment.
 import os
 import sys
 import json
+import numpy as np
 
 import susan as SUSAN
 
-from base import createTomosFile
 
+def createSubsets(params):
+    parts = SUSAN.data.Particles(filename=params['input_parts'])
+    results = [parts]
 
-def create2DGrid(params, ts_id):
-    """ Create a 2D grid to estimate the CTF. """
-    tomos = SUSAN.read(f"tomo{ts_id}.tomostxt")
-    grid = SUSAN.data.Particles.grid_2d(tomos, step_pixels=params['sampling'])
-    grid.save("grid_ctf.ptclsraw")
+    if params['select_refs']:
+        for ref in params['refs_list']:
+            res = SUSAN.data.Particles.MRA.select_ref(results[-1], ref-1)
+            results.append(res)
 
+    if params['do_thr_cc']:
+        nrefs_remaining = results[-1].n_refs
+        for i in range(nrefs_remaining):
+            ind = np.logical_and(results[-1].ali_cc[i] > params['cc_min'],
+                                 results[-1].ali_cc[i] < params['cc_max'])
+            # check if all values are False
+            if np.all(ind == False):
+                raise Exception("CC limits are too strict, no particles match.")
+            res = results[-1].select(ind)
+            results.append(res)
 
-def estimateCtf(params, ts_id):
-    """ Run CTF estimator. """
-    ctf_est = SUSAN.modules.CtfEstimator()
-    ctf_est.binning = params['binning']
-    ctf_est.list_gpus_ids = params['gpus']  # ID's of GPUs to use
-    ctf_est.threads_per_gpu = params['thr_per_gpu']
-    ctf_est.resolution_angs.min_val = params['min_res']  # angstroms
-    ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
-    ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms
-    ctf_est.defocus_angstroms.max_val = params['def_max']  # angstroms
-    ctf_est.estimate('ctf_grid', f"tomo{ts_id}.tomostxt",
-                     "grid_ctf.ptclsraw", params['patch_size'])
+    print("Remaining particles: ", results[-1].n_ptcl)
+    results[-1].save('particles.ptclsraw')
+    del results
 
 
 if __name__ == '__main__':
@@ -67,11 +70,7 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                ts_id = params['ts_nums'][0]
-
-            createTomosFile(params)
-            create2DGrid(params, ts_id)
-            estimateCtf(params, ts_id)
+            createSubsets(params)
         else:
             raise FileNotFoundError(inputJson)
     else:

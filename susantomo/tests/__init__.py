@@ -29,10 +29,12 @@ from pyworkflow.utils import weakImport
 
 
 with weakImport("tomo"):
-    from .test_protocols_susan import TestSusanCtf
+    from .test_protocols import TestSusanCtf
 
 DataSet(name='tutorialDataImodCTF',
         folder='tutorialDataImodCTF',
         files={
             'tsCtf1': 'WTI042413_1series4.mrc'
         })
+
+DataSet(name='empiar10064', folder='tutorialDataSusan', files={})

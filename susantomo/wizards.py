@@ -1,4 +1,3 @@
-# coding: utf-8
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
@@ -24,27 +23,25 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-@article{Sanchez2019,
-  author={Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  booktitle={27th European Signal Processing Conference (EUSIPCO)},
-  title={Fast Alignment of Limited Angle Tomograms by projected Cross Correlation},
-  year={2019},
-  volume={},
-  number={},
-  pages={1-5},
-  doi={10.23919/EUSIPCO.2019.8903041}
-  }
 
-@article{Sanchez2019b,
-  doi = {10.1007/978-3-030-20205-7_34},
-  url = {https://doi.org/10.1007/978-3-030-20205-7_34},
-  year = {2019},
-  publisher = {Springer International Publishing},
-  pages = {415--426},
-  author = {Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  title = {Fast Cross Correlation for Limited Angle Tomographic Data},
-  booktitle = {Image Analysis}
-}
+from pwem.wizards.wizard import EmWizard
 
-"""
+from .protocols import ProtSusanMRA, ProtSusanAverage
+
+
+class SusanBoxSizeWizard(EmWizard):
+    _targets = [(ProtSusanMRA, ['boxSize', 'tomoSize']),
+                (ProtSusanAverage, ['boxSize', 'tomoSize'])]
+
+    def show(self, form, *params):
+        prot = form.protocol
+        inputCoords = prot.inputSetOfSubTomograms.get().getCoordinates3D()
+
+        if not inputCoords:
+            print('You must specify input subtomograms')
+            return
+
+        box = inputCoords.getBoxSize()
+        size = inputCoords.getPrecedents().getDim()[-1]
+        form.setVar('boxSize', box)
+        form.setVar('tomoSize', size)

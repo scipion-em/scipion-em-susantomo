@@ -24,11 +24,20 @@
 # *
 # **************************************************************************
 
+# Supported versions:
+V0_1 = '0.1'
 
 SUSAN_HOME = 'SUSAN_HOME'
 SUSAN_CUDA_LIB = 'SUSAN_CUDA_LIB'
-DEFAULT_ACTIVATION_CMD = 'conda activate susan-1.0'
+DEFAULT_ACTIVATION_CMD = f'conda activate susan-{V0_1}'
 SUSAN_ENV_ACTIVATION = 'SUSAN_ENV_ACTIVATION'
 
-# Supported versions:
-V1_0 = '1.0'
+# Viewer constants
+ITER_LAST = 0
+ITER_SELECTION = 1
+
+CLS_ALL = 0
+CLS_SELECTION = 1
+
+VOLUME_SLICES = 0
+VOLUME_CHIMERA = 1

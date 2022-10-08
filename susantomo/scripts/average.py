@@ -36,28 +36,21 @@ import json
 
 import susan as SUSAN
 
-from base import createTomosFile
+from base import *
 
 
-def create2DGrid(params, ts_id):
-    """ Create a 2D grid to estimate the CTF. """
-    tomos = SUSAN.read(f"tomo{ts_id}.tomostxt")
-    grid = SUSAN.data.Particles.grid_2d(tomos, step_pixels=params['sampling'])
-    grid.save("grid_ctf.ptclsraw")
-
-
-def estimateCtf(params, ts_id):
-    """ Run CTF estimator. """
-    ctf_est = SUSAN.modules.CtfEstimator()
-    ctf_est.binning = params['binning']
-    ctf_est.list_gpus_ids = params['gpus']  # ID's of GPUs to use
-    ctf_est.threads_per_gpu = params['thr_per_gpu']
-    ctf_est.resolution_angs.min_val = params['min_res']  # angstroms
-    ctf_est.resolution_angs.max_val = params['max_res']  # angstroms
-    ctf_est.defocus_angstroms.min_val = params['def_min']  # angstroms
-    ctf_est.defocus_angstroms.max_val = params['def_max']  # angstroms
-    ctf_est.estimate('ctf_grid', f"tomo{ts_id}.tomostxt",
-                     "grid_ctf.ptclsraw", params['patch_size'])
+def reconstructAvg(params):
+    """ Reconstruct an average 3D volume. """
+    avgr = SUSAN.modules.Averager()
+    avgr.list_gpus_ids = params['gpus']
+    avgr.threads_per_gpu = params['thr_per_gpu']
+    avgr.ctf_correction = params['ctf_corr_avg']
+    avgr.rec_halfsets = params['do_halfsets']
+    avgr.symmetry = params['symmetry']
+    avgr.padding_type = params['padding']
+    avgr.reconstruct("average", "input/input_tomos.tomostxt",
+                     "input/input_particles.ptclsraw",
+                     box_size=params['box_size'])
 
 
 if __name__ == '__main__':
@@ -67,11 +60,11 @@ if __name__ == '__main__':
         if os.path.exists(inputJson):
             with open(inputJson) as fn:
                 params = json.load(fn)
-                ts_id = params['ts_nums'][0]
 
             createTomosFile(params)
-            create2DGrid(params, ts_id)
-            estimateCtf(params, ts_id)
+            if not params['continue']:
+                createPtclsFile(params, n_refs=1)
+            reconstructAvg(params)
         else:
             raise FileNotFoundError(inputJson)
     else:

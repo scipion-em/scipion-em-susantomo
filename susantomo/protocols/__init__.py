@@ -25,3 +25,6 @@
 # **************************************************************************
 
 from .protocol_estimate_ctf import ProtSusanEstimateCtf
+from .protocol_average import ProtSusanAverage
+from .protocol_mra import ProtSusanMRA
+from .protocol_subset import ProtSusanSubset

@@ -1,9 +1,8 @@
-# coding: utf-8
 # **************************************************************************
 # *
 # * Authors:     Grigory Sharov (gsharov@mrc-lmb.cam.ac.uk)
 # *
-# * MRC Laboratory of Molecular Biology (MRC-LMB)
+# * MRC Laboratory of Molecular Biology, MRC-LMB
 # *
 # * This program is free software; you can redistribute it and/or modify
 # * it under the terms of the GNU General Public License as published by
@@ -24,27 +23,29 @@
 # *  e-mail address 'scipion@cnb.csic.es'
 # *
 # **************************************************************************
-"""
-@article{Sanchez2019,
-  author={Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  booktitle={27th European Signal Processing Conference (EUSIPCO)},
-  title={Fast Alignment of Limited Angle Tomograms by projected Cross Correlation},
-  year={2019},
-  volume={},
-  number={},
-  pages={1-5},
-  doi={10.23919/EUSIPCO.2019.8903041}
-  }
 
-@article{Sanchez2019b,
-  doi = {10.1007/978-3-030-20205-7_34},
-  url = {https://doi.org/10.1007/978-3-030-20205-7_34},
-  year = {2019},
-  publisher = {Springer International Publishing},
-  pages = {415--426},
-  author = {Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
-  title = {Fast Cross Correlation for Limited Angle Tomographic Data},
-  booktitle = {Image Analysis}
-}
+import pyworkflow.object as pwobj
+from pwem.objects import EMObject
 
-"""
+
+class TomoSubStacks(EMObject):
+
+    def __init__(self, filename=None, n_ptcl=1, n_refs=1,
+                 **kwargs):
+        EMObject.__init__(self, **kwargs)
+
+        self.filename = pwobj.String(filename)
+        self.n_ptcl = pwobj.Integer(n_ptcl)
+        self.n_refs = pwobj.Integer(n_refs)
+
+    def __str__(self):
+        return f"TomoSubStacks ({self.n_ptcl} items, {self.n_refs} classes)"
+
+    def getNumRefs(self):
+        return self.n_refs.get()
+
+    def getSize(self):
+        return self.n_ptcl.get()
+
+    def getFileName(self):
+        return self.filename.get()

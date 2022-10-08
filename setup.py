@@ -108,7 +108,7 @@ setup(
         #   3 - Alpha
         #   4 - Beta
         #   5 - Production/Stable
-        'Development Status :: 3 - Alpha',
+        'Development Status :: 4 - Beta',
 
         # Indicate who your project is intended for
         #   'Intended Audience :: Users',
@@ -144,7 +144,7 @@ setup(
     #
     # For an analysis of "install_requires" vs pip's requirements files see:
     # https://packaging.python.org/en/latest/requirements.html
-    install_requires=['scipion-em', 'scipion-em-tomo'],  # Optional
+    install_requires=['scipion-em', 'scipion-em-tomo', 'scipion-em-imod'],  # Optional
 
     # List additional groups of dependencies here (e.g. development
     # dependencies). Users will be able to install these using the "extras"
