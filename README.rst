@@ -55,7 +55,7 @@ b) Developer's version
 - SUSAN sources will be downloaded and compiled automatically with the plugin, but you can also link an existing installation. Default installation path assumed is ``software/em/susan-0.1``, if you want to change it, set *SUSAN_HOME* in ``scipion.conf`` file to the folder where the SUSAN is installed.
 - SUSAN installation requires CUDA libraries, gcc >= 9.x and cmake 3.22.x. OpenMPI is optional amd only required for running SUSAN on more than one cluster node. MATLAB is not required as this plugin uses Python API.
 - If you need to use CUDA different from the one used during Scipion installation (defined by *CUDA_LIB*), you can add *SUSAN_CUDA_LIB* variable to the config file.
-- If you have to use a MPI for SUSAN different from Scipion MPI, you can set *SUSAN_MPI_BIN* and *SUSAN_MPI_LIB* variables in the config file.
+- If you have to use a MPI for SUSAN different from Scipion MPI, you can set *SUSAN_MPI_BIN* and *SUSAN_MPI_LIB* variables in the config file. At the moment MPI support in the plugin is not working.
 
 
 Verifying
@@ -74,6 +74,7 @@ Protocols
 * ctf estimation
 * multi-reference alignment
 * average and reconstruct
+* create a subset
 
 References
 -----------

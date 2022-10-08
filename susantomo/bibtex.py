@@ -36,4 +36,15 @@
   doi={10.23919/EUSIPCO.2019.8903041}
   }
 
+@article{Sanchez2019b,
+  doi = {10.1007/978-3-030-20205-7_34},
+  url = {https://doi.org/10.1007/978-3-030-20205-7_34},
+  year = {2019},
+  publisher = {Springer International Publishing},
+  pages = {415--426},
+  author = {Sánchez, Ricardo M. and Mester, Rudolf and Kudryashev, Mikhail},
+  title = {Fast Cross Correlation for Limited Angle Tomographic Data},
+  booktitle = {Image Analysis}
+}
+
 """

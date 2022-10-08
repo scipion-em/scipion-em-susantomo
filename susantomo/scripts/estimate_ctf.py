@@ -59,10 +59,6 @@ def estimateCtf(params, ts_id):
     ctf_est.estimate('ctf_grid', f"tomo{ts_id}.tomostxt",
                      "grid_ctf.ptclsraw", params['patch_size'])
 
-    #tomos = SUSAN.read(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
-    #tomos.set_defocus(0, os.path.join(output_dir, f'ctf_grid/Tomo{ts_id:03g}/defocus.txt'))
-    #tomos.save(os.path.join(output_dir, f"tomo{ts_id}.tomostxt"))
-
 
 if __name__ == '__main__':
     if len(sys.argv) > 0:

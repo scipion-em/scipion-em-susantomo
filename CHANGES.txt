@@ -1,3 +1,8 @@
+3.0.0b1:
+    - viewer working
+    - continue mode refactored
+    - more mra params added
+    - subset protocol added
 3.0.0a1:
     - FSC and CC viewers tbd
     - input subtomo alignments are ignored by Susan Python API at the moment

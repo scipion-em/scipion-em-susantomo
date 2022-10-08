@@ -32,15 +32,15 @@ import pyworkflow.utils as pwutils
 from .constants import *
 
 
-__version__ = '3.0a1'
-_references = ['Sanchez2019']
+__version__ = '3.0b1'
+_references = ['Sanchez2019', 'Sanchez2019b']
 _logo = "susan_logo.png"
 
 
 class Plugin(pwem.Plugin):
     _homeVar = SUSAN_HOME
     _pathVars = [SUSAN_HOME]
-    _url = "https://github.com/scipion-em/scipion-em-susantomo"
+    _url = "https://github.com/rkms86/SUSAN"
     _supportedVersions = [V0_1]
 
     @classmethod

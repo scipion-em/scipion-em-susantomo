@@ -151,8 +151,7 @@ class TestSusanMRAWorkflow(TestBase):
         print(magentaStr("\n==> Testing susan - multi-reference alignment:"))
         protMRA = ProtSusanMRA(tomoSize=110, boxSize=32, numberOfIters=1,
                                coneRange=0, coneSampling=1, inplaneRange=0,
-                               inplaneSampling=1, refine=2, refineFactor=1,
-                               allowDrift=True)
+                               inplaneSampling=1, refine=0, refineFactor=1)
         protMRA.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
         protMRA.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
         protMRA.inputRefs.set([protAvg.outputAverage])

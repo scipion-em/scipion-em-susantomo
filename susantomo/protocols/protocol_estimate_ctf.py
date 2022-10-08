@@ -136,6 +136,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'tomo_size': tomo_size,
             'sampling': self.gridSampling.get(),
             'binning': int(math.log2(self.ctfDownFactor.get())),
+            'has_ctf': self.hasCtf(),
             'gpus': self.getGpuList(),
             'min_res': paramDict['lowRes'],
             'max_res': paramDict['highRes'],
@@ -205,3 +206,6 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         ctfTomo = CTFTomo.ctfModelToCtfTomo(ctf)
 
         return ctfTomo
+
+    def hasCtf(self):
+        return isinstance(self.inputTiltSeries.get(), SetOfCTFTomoSeries)
