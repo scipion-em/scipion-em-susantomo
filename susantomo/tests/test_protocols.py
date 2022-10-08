@@ -55,7 +55,7 @@ class TestBase(BaseTest):
     def runImportCtf(cls, **kwargs):
         cls.protImportCtf = cls.newProtocol(ProtImodImportSetOfCtfTomoSeries, **kwargs)
         cls.launchProtocol(cls.protImportCtf)
-        cls.assertIsNotNone(cls.protImportCtf.outputSetOfCTFTomoSeries,
+        cls.assertIsNotNone(cls.protImportCtf.CTFTomoSeries,
                             "SetOfCTFTomoSeries has not been produced.")
         return cls.protImportCtf
 
@@ -121,7 +121,7 @@ class TestSusanMRAWorkflow(TestBase):
         protRecon = ProtImodTomoReconstruction(tomoThickness=110.0)
         protRecon.inputSetOfTiltSeries.set(cls.protImportTS.outputTiltSeries)
         cls.launchProtocol(protRecon)
-        cls.assertIsNotNone(protRecon.outputSetOfTomograms,
+        cls.assertIsNotNone(protRecon.Tomograms,
                             "SetOfTomograms has not been produced.")
 
         print(magentaStr("\n==> Importing data - coordinates 3D:"))
@@ -130,7 +130,7 @@ class TestSusanMRAWorkflow(TestBase):
                                                importFrom=3,  # dynamo
                                                samplingRate=20.96,
                                                boxSize=32,
-                                               importTomograms=protRecon.outputSetOfTomograms)
+                                               importTomograms=protRecon.Tomograms)
 
         print(magentaStr("\n==> Running emantomo - extraction from tomogram:"))
         cls.protExtract = ProtEmanExtractSubtomo(inputCoordinates=protImportCoords.outputCoordinates,
@@ -143,7 +143,7 @@ class TestSusanMRAWorkflow(TestBase):
         print(magentaStr("\n==> Testing susan - average and reconstruct:"))
         protAvg = ProtSusanAverage(tomoSize=110, boxSize=32)
         protAvg.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
-        protAvg.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
+        protAvg.inputTiltSeries.set(self.protImportCtf.CTFTomoSeries)
         self.launchProtocol(protAvg)
         self.assertIsNotNone(protAvg.outputAverage,
                              "AverageSubTomogram has not been produced.")
@@ -153,7 +153,7 @@ class TestSusanMRAWorkflow(TestBase):
                                coneRange=0, coneSampling=1, inplaneRange=0,
                                inplaneSampling=1, refine=0, refineFactor=1)
         protMRA.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
-        protMRA.inputTiltSeries.set(self.protImportCtf.outputSetOfCTFTomoSeries)
+        protMRA.inputTiltSeries.set(self.protImportCtf.CTFTomoSeries)
         protMRA.inputRefs.set([protAvg.outputAverage])
         protMRA.inputMasks.set([protAvg.outputAverage])
         self.launchProtocol(protMRA)
