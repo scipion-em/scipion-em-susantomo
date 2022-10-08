@@ -58,6 +58,11 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         form.addParam('numberOfIters', params.IntParam,
                       label='Iterations', default=3,
                       help="Number of iterations to run in a given round.")
+        form.addParam('alignType', params.EnumParam,
+                      choices=['2D', '3D'], default=1,
+                      label="Alignment type",
+                      help="The alignment can be in 3D (subtomogram "
+                           "averaging) or in 2D (projection refinement).")
         form.addParam('ctfCorrAln', params.EnumParam,
                       choices=['none', 'on_reference', 'on_substack',
                                'wiener_ssnr', 'wiener_white', 'cfsc'],
@@ -156,9 +161,16 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
                       help="New lowpass will be *lp[i+1] = min(lp[i]+2, bp)* "
                            "where bp is estimated resolution of iteration i.")
         form.addParam('applyFOM', params.BooleanParam, default=False,
+                      expertLevel=params.LEVEL_ADVANCED,
                       label="Apply FOM filter?",
                       help="Denoise reference with FOM "
                            "(Sindelar and Grigorieff, 2012) for every "
+                           "iteration.")
+        form.addParam('applyL0', params.BooleanParam, default=False,
+                      expertLevel=params.LEVEL_ADVANCED,
+                      label="Apply M-sparse constraint?",
+                      help="Use M-sparse constraint "
+                           "(Blumensath and Davies, 2008) for every "
                            "iteration.")
 
         form.addSection(label='Shifts & thresholds')
@@ -176,6 +188,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
         line.addParam('high', params.IntParam,
                       label='High frequency (px)', default=2)
         form.addParam('rolloff', params.IntParam,
+                      expertLevel=params.LEVEL_ADVANCED,
                       label='Band-pass roll-off (px)', default=2)
 
     # --------------------------- STEPS functions -----------------------------
@@ -226,6 +239,7 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'iter': self.numberOfIters.get(),
             'allow_drift': bool(self.allowDrift),
             'cc': self.threshold.get(),
+            'align_type': 3 if self.alignType.get() == 1 else 2,
             'low': self.low.get(),
             'high': self.high.get(),
             'rolloff': self.rolloff.get(),
@@ -238,7 +252,8 @@ class ProtSusanMRA(ProtSusanBase, ProtTomoSubtomogramAveraging):
             'range_factor': self.rangeFactor.get() if self.autoStep else 0,
             'inc_lowpass': bool(self.incLowpass),
             'randomize': bool(self.randomizeAngles),
-            'apply_fom': bool(self.applyFOM)
+            'apply_fom': bool(self.applyFOM),
+            'apply_l0': bool(self.applyL0)
         }
 
         jsonFn = self._getTmpPath("params.json")

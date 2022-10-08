@@ -60,6 +60,7 @@ def createSubsets(params):
 
     print("Remaining particles: ", results[-1].n_ptcl)
     results[-1].save('particles.ptclsraw')
+    del results
 
 
 if __name__ == '__main__':

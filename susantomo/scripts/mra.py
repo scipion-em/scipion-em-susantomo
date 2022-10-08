@@ -51,7 +51,7 @@ def runAlignment(params):
     mngr.list_gpus_ids = params['gpus']
     mngr.threads_per_gpu = params['thr_per_gpu']
     mngr.cc_threshold = params['cc']
-    mngr.iteration_type = 3  # 3D Alignment
+    mngr.iteration_type = params['align_type']
 
     mngr.averager.ctf_correction = params['ctf_corr_avg']
     mngr.averager.rec_halfsets = params['do_halfsets']
@@ -103,12 +103,8 @@ def runAlignment(params):
         with open('mra/info.pkl', 'wb') as f:
             pickle.dump([fsc, cc], f)
 
-        if params['apply_fom']:
-            # Denoise reference with FOM [Sindelar and Grigorieff, 2012]
-            m = mngr.get_names_map(i)
-            v, a = SUSAN.io.mrc.read(m)
-            v_f = SUSAN.utils.apply_FOM(v, mngr.get_fsc(i))
-            SUSAN.io.mrc.write(v_f, m, a)
+        if params['apply_fom'] or params['apply_l0']:
+            postProcess(params, mngr, n_refs=n_refs, iter=i)
 
 
 if __name__ == '__main__':
@@ -124,9 +120,7 @@ if __name__ == '__main__':
             if not params['reuse_refs']:
                 createRefsFile(params, params['refs_nums'])
 
-            if not params['continue']:
-                createPtclsFile(params, params['refs_nums'])
-
+            createPtclsFile(params, params['refs_nums'], params['continue'])
             runAlignment(params)
         else:
             raise FileNotFoundError(inputJson)

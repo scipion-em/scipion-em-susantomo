@@ -62,17 +62,20 @@ def createTomosFile(params):
     tomos.save(output)
 
 
-def createPtclsFile(params, n_refs):
+def createPtclsFile(params, n_refs, do_continue=False):
     """ Load DYNAMO table with NUMPY and convert it to PTCLSRAW. """
-    parts = np.loadtxt("../tmp/input_particles.tbl", unpack=True)
-    tomos = SUSAN.read("input/input_tomos.tomostxt")
-    randomize = params.get("randomize", False)
-    ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
-                                             position=parts[23:26, :].transpose(),
-                                             ptcls_id=parts[0],
-                                             tomos_id=parts[19],
-                                             randomize_angles=randomize)
-    # Duplicate references
+    if do_continue:
+        ptcls = SUSAN.data.Particles(filename="input/input_particles.ptclsraw")
+    else:
+        parts = np.loadtxt("../tmp/input_particles.tbl", unpack=True)
+        tomos = SUSAN.read("input/input_tomos.tomostxt")
+        randomize = params.get("randomize", False)
+        ptcls = SUSAN.data.Particles.import_data(tomograms=tomos,
+                                                 position=parts[23:26, :].transpose(),
+                                                 ptcls_id=parts[0],
+                                                 tomos_id=parts[19],
+                                                 randomize_angles=randomize)
+    # Duplicate reference indexes
     if n_refs > 1:
         for _ in range(n_refs-1):
             SUSAN.data.Particles.MRA.duplicate(ptcls, 0)
@@ -89,6 +92,26 @@ def createRefsFile(params, n_refs):
         refs.msk[i] = params['inputMasks'][i]
 
     refs.save("input/input_refs.refstxt")
+
+
+def postProcess(params, mngr, n_refs=1, iter=1):
+    """ Apply FOM or l0 filter to output maps. """
+    maps = [mngr.get_names_map(iter, ref=i) for i in range(1, n_refs+1)]
+
+    for map in maps:
+        v, apix = SUSAN.io.mrc.read(map)
+        res = [v]
+        if params['apply_fom']:
+            # Denoise reference with FOM [Sindelar and Grigorieff, 2012]
+            v_f = SUSAN.utils.apply_FOM(res[-1], mngr.get_fsc(iter))
+            res.append(v_f)
+        if params['apply_l0']:
+            # l0-norm: Using M-sparse constraint [Blumensath and Davies, 2008]
+            v_f = SUSAN.utils.denoise_l0(res[-1], l0_lambda=0.05)
+            res.append(v_f)
+        map = map.replace(".mrc", "_denoised.mrc")
+        SUSAN.io.mrc.write(res[-1], map, apix)
+        del res
 
 
 def getIterNumber(path):
