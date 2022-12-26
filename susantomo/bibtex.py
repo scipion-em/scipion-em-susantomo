@@ -38,7 +38,7 @@
 
 @article{Sanchez2019b,
   doi = {10.1007/978-3-030-20205-7_34},
-  url = {https://doi.org/10.1007/978-3-030-20205-7_34},
+  url = {https://dx.doi.org/10.1007/978-3-030-20205-7_34},
   year = {2019},
   publisher = {Springer International Publishing},
   pages = {415--426},
