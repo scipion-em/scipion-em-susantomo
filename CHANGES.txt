@@ -1,9 +1,10 @@
-3.0.0b1:
+3.0b2: fix the test when emantomo is missing
+3.0b1:
     - viewer working
     - continue mode refactored
     - more mra params added
     - subset protocol added
-3.0.0a1:
+3.0a1:
     - FSC and CC viewers tbd
     - input subtomo alignments are ignored by Susan Python API at the moment
     - input TS must be aligned. Susan Python API is missing the import of *.xf alignments at the moment

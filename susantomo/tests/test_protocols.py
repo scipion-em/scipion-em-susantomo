@@ -33,14 +33,6 @@ from tomo.protocols import ProtImportTs, ProtImportCoordinates3D
 from imod.protocols import ProtImodImportSetOfCtfTomoSeries, ProtImodTomoReconstruction
 from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA, ProtSusanAverage
 
-try:
-    ProtEmanExtractSubtomo = Domain.importFromPlugin("emantomo.protocols",
-                                                     "EmanProtTomoExtraction",
-                                                     doRaise=True)
-except ImportError as e:
-    print("Emantomo plugin not found! You need to install it "
-          "to be able to run this test.")
-
 
 class TestBase(BaseTest):
     @classmethod
@@ -124,6 +116,10 @@ class TestSusanMRAWorkflow(TestBase):
         cls.assertIsNotNone(protRecon.Tomograms,
                             "SetOfTomograms has not been produced.")
 
+        ProtEmanExtractSubtomo = Domain.importFromPlugin("emantomo.protocols",
+                                                         "EmanProtTomoExtraction",
+                                                         doRaise=True,
+                                                         errorMsg="Emantomo plugin is required for this test")
         print(magentaStr("\n==> Importing data - coordinates 3D:"))
         protImportCoords = cls.runImportCoords(filesPath=cls.path,
                                                filesPattern="mixed*.tbl",
