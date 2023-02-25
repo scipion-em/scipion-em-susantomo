@@ -1,3 +1,4 @@
+3.0b3: fix python <3.11 (thanks @DShepherd)
 3.0b2: fix the test when emantomo is missing
 3.0b1:
     - viewer working

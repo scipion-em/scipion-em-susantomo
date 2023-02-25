@@ -32,7 +32,7 @@ import pyworkflow.utils as pwutils
 from .constants import *
 
 
-__version__ = '3.0b2'
+__version__ = '3.0b3'
 _references = ['Sanchez2019', 'Sanchez2019b']
 _logo = "susan_logo.png"
 
@@ -102,7 +102,7 @@ class Plugin(pwem.Plugin):
             ENV_NAME = "susan-%s" % ver
             installCmds = [
                 cls.getCondaActivationCmd(),
-                f'conda create -y -n {ENV_NAME} python=3 && ',
+                f'conda create -y -n {ENV_NAME} "python<3.11" && ',
                 f'conda activate {ENV_NAME} && ',
                 f'cd .. && rmdir susan-{ver} && ',
                 f'git clone https://github.com/rkms86/SUSAN {ENV_NAME} && ',
