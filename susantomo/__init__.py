@@ -40,7 +40,7 @@ _logo = "susan_logo.png"
 class Plugin(pwem.Plugin):
     _homeVar = SUSAN_HOME
     _pathVars = [SUSAN_HOME]
-    _url = "https://github.com/rkms86/SUSAN"
+    _url = "https://github.com/scipion-em/scipion-em-susantomo"
     _supportedVersions = [V0_1]
 
     @classmethod
