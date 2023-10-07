@@ -98,19 +98,27 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
                       label='FFT box size (px)',
                       help='Boxsize in pixels to be used for FFT')
 
-        form.addParallelSection(threads=1, mpi=1)
+        form.addParallelSection(threads=1)
 
     # --------------------------- STEPS functions -----------------------------
     def processTiltSeriesStep(self, tsId):
         """Run susan_estimate_ctf program"""
-        ts = self._getTiltSeries(tsId)
+        with self._lock:
+            ts = self._getTiltSeries(tsId)
+            tsInputFn = ts.getFirstItem().getFileName()
+            dims = ts.getDim()
+            size = ts.getSize()
+            ts_num = ts.getObjId()
+            pixSize = ts.getSamplingRate()
+
+        tiList = self._tsDict.getTiList(tsId)
+
         extraPrefix = self._getExtraPath(tsId)
         tmpPrefix = self._getTmpPath(tsId)
         pwutils.makePath(tmpPrefix)
         pwutils.makePath(extraPrefix)
-        tsInputFn = ts.getFirstItem().getFileName()
-        tsFn = self.getFilePath(tsId, tmpPrefix, ".mrc")
-        tiltFn = self.getFilePath(tsId, tmpPrefix, ".tlt")
+        tsFn = self.getFilePath(tiList, tmpPrefix, ".mrc")
+        tiltFn = self.getFilePath(tiList, tmpPrefix, ".tlt")
 
         # has to be float32
         ih = emlib.image.ImageHandler()
@@ -124,15 +132,14 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         ts.generateTltFile(tiltFn)
 
         paramDict = self.getCtfParamsDict()
-        tomo_size = [ts.getDim()[0], ts.getDim()[1], self.tomoSize.get()]
-        ts_num = ts.getObjId()
+        tomo_size = [dims[0], dims[1], self.tomoSize.get()]
 
         params = {
             'ts_nums': [ts_num],
             'inputStacks': [os.path.abspath(tsFn)],
             'inputAngles': [os.path.abspath(tiltFn)],
-            'num_tilts': ts.getSize(),
-            'pix_size': ts.getSamplingRate(),
+            'num_tilts': size,
+            'pix_size': pixSize,
             'tomo_size': tomo_size,
             'sampling': self.gridSampling.get(),
             'binning': int(math.log2(self.ctfDownFactor.get())),
@@ -149,7 +156,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             'thr_per_gpu': self.numberOfThreads.get()
         }
 
-        jsonFn = self.getFilePath(tsId, tmpPrefix, ".json")
+        jsonFn = self.getFilePath(tiList, tmpPrefix, ".json")
         with open(jsonFn, "w") as fn:
             json.dump(params, fn, indent=4)
 
@@ -165,7 +172,7 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
             psds = self.getOutputPath(tsId, ts_num) + "/ctf_fitting_result.mrc"
             ctf = CTFModel()
 
-            for i, ti in enumerate(self._tsDict.getTiList(tsId)):
+            for i, ti in enumerate(tiList):
                 ti.setCTF(self.getCtfTi(ctf, ctfResult, i, psds))
 
             if not pwutils.envVarOn(SCIPION_DEBUG_NOCLEAN):
@@ -175,25 +182,15 @@ class ProtSusanEstimateCtf(ProtTsEstimateCTF):
         except Exception as e:
             self.error(f"ERROR: SUSAN ctf estimation has failed for {tsFn}: {e}")
 
-    # --------------------------- INFO functions ------------------------------
-    def _validate(self):
-        errors = []
-
-        if self.numberOfMpi.get() > 1:
-            errors.append("MPI not supported, use threads (per GPU) instead.")
-
-        return errors
-
     # --------------------------- UTILS functions -----------------------------
     def _doInsertTiltImageSteps(self):
         """ Default True, but if return False, the steps for each
         TiltImage will not be inserted. """
         return False
 
-    def getFilePath(self, tsObjId, prefix, ext=None):
-        ts = self._getTiltSeries(tsObjId)
-        return os.path.join(prefix,
-                            ts.getFirstItem().parseFileName(extension=ext))
+    def getFilePath(self, tiList, prefix, ext=None):
+        ti = tiList[0]
+        return os.path.join(prefix, ti.parseFileName(extension=ext))
 
     def getOutputPath(self, tsObjId, tsNum):
         return os.path.join(self._getExtraPath(tsObjId),
