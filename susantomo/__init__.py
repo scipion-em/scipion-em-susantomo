@@ -107,12 +107,12 @@ class Plugin(pwem.Plugin):
                 f'cd .. && rmdir susan-{ver} && ',
                 f'git clone https://github.com/rkms86/SUSAN {ENV_NAME} && ',
                 f'cd {ENV_NAME}/extern && ',
-                f'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
-                f'cd eigen && mkdir build && cd build && '
-                f'cmake ../ -DCMAKE_INSTALL_PREFIX=../../eigen_lib && make install && ',
-                f'cd ../../../ && mkdir bin && cd bin && cmake .. && ',
+                'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
+                'cd eigen && mkdir build && cd build && '
+                'cmake ../ -DCMAKE_INSTALL_PREFIX=../../eigen_lib && make install && ',
+                'cd ../../../ && mkdir bin && cd bin && cmake .. && ',
                 f'make -j {env.getProcessors()} && make prepare_python && ',
-                f'cd .. && pip install -e .'
+                'cd .. && pip install -e .'
             ]
 
             susanCmds = [(" ".join(installCmds), 'bin/susan_aligner_mpi')]

@@ -25,7 +25,6 @@
 # **************************************************************************
 import pickle
 import os
-import numpy as np
 from matplotlib.figure import Figure
 
 import pyworkflow.protocol.params as params
@@ -37,7 +36,8 @@ from pwem.viewers import EmPlotter
 from pwem.viewers import ObjectView, ChimeraView, EmProtocolViewer, FscViewer
 from tomo.viewers.viewers_data import CtfEstimationTomoViewer
 
-from .constants import *
+from .constants import (ITER_LAST, ITER_SELECTION, CLS_SELECTION, CLS_ALL,
+                        VOLUME_SLICES, VOLUME_CHIMERA)
 from .protocols import ProtSusanEstimateCtf, ProtSusanMRA
 
 

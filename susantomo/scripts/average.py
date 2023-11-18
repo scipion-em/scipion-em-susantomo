@@ -36,7 +36,7 @@ import json
 
 import susan as SUSAN
 
-from base import *
+from base import createTomosFile, createPtclsFile
 
 
 def reconstructAvg(params):

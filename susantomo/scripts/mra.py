@@ -38,7 +38,7 @@ import numpy as np
 
 import susan as SUSAN
 
-from base import *
+from base import postProcess, createPtclsFile, createTomosFile, createRefsFile
 
 
 def runAlignment(params):

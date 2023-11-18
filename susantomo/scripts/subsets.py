@@ -54,7 +54,7 @@ def createSubsets(params):
                                  results[-1].ali_cc[i] < params['cc_max'])
             # check if all values are False
             if np.all(ind == False):
-                raise Exception("CC limits are too strict, no particles match.")
+                raise RuntimeError("CC limits are too strict, no particles match.")
             res = results[-1].select(ind)
             results.append(res)
 
