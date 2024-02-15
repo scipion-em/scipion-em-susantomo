@@ -29,8 +29,8 @@ from pyworkflow.tests import BaseTest, DataSet, setupTestProject
 from pyworkflow.utils import magentaStr
 from pwem import Domain
 
-from tomo.protocols import ProtImportTs, ProtImportCoordinates3D
-from imod.protocols import ProtImodImportSetOfCtfTomoSeries, ProtImodTomoReconstruction
+from tomo.protocols import ProtImportTs, ProtImportCoordinates3D, ProtImportTsCTF
+from imod.protocols import ProtImodTomoReconstruction
 from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA, ProtSusanAverage
 
 
@@ -45,9 +45,9 @@ class TestBase(BaseTest):
 
     @classmethod
     def runImportCtf(cls, **kwargs):
-        cls.protImportCtf = cls.newProtocol(ProtImodImportSetOfCtfTomoSeries, **kwargs)
+        cls.protImportCtf = cls.newProtocol(ProtImportTsCTF, **kwargs)
         cls.launchProtocol(cls.protImportCtf)
-        cls.assertIsNotNone(cls.protImportCtf.CTFTomoSeries,
+        cls.assertIsNotNone(cls.protImportCtf.CTFs,
                             "SetOfCTFTomoSeries has not been produced.")
         return cls.protImportCtf
 
@@ -106,6 +106,7 @@ class TestSusanMRAWorkflow(TestBase):
 
         print(magentaStr("\n==> Importing data - tomo CTFs:"))
         cls.protImportCtf = cls.runImportCtf(filesPath=cls.path,
+                                             importFrom=1,  # IMOD
                                              filesPattern="mixedCTEM_tomo*.defocus",
                                              inputSetOfTiltSeries=cls.protImportTS.outputTiltSeries)
 
