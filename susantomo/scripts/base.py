@@ -98,8 +98,8 @@ def postProcess(params, mngr, n_refs=1, iter=1):
     """ Apply FOM or l0 filter to output maps. """
     maps = [mngr.get_names_map(iter, ref=i) for i in range(1, n_refs+1)]
 
-    for map in maps:
-        v, apix = SUSAN.io.mrc.read(map)
+    for fn in maps:
+        v, apix = SUSAN.io.mrc.read(fn)
         res = [v]
         if params['apply_fom']:
             # Denoise reference with FOM [Sindelar and Grigorieff, 2012]
@@ -109,8 +109,8 @@ def postProcess(params, mngr, n_refs=1, iter=1):
             # l0-norm: Using M-sparse constraint [Blumensath and Davies, 2008]
             v_f = SUSAN.utils.denoise_l0(res[-1], l0_lambda=0.05)
             res.append(v_f)
-        map = map.replace(".mrc", "_denoised.mrc")
-        SUSAN.io.mrc.write(res[-1], map, apix)
+        fn = fn.replace(".mrc", "_denoised.mrc")
+        SUSAN.io.mrc.write(res[-1], fn, apix)
         del res
 
 
@@ -120,7 +120,7 @@ def getIterNumber(path):
     files = sorted(glob(path))
     if files:
         f = files[-1]
-        s = re.compile('ite_(\d{4})').search(f)
+        s = re.compile(r'ite_(\d{4})').search(f)
         if s:
             result = int(s.group(1))  # group 1 is 1 digit iteration number
     return result

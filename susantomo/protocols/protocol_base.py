@@ -83,7 +83,7 @@ class ProtSusanBase(EMProtocol):
     def _createIterTemplates(self):
         """ Setup the regex on how to find iterations. """
         self._iterTemplate = self._getFileName('ptcls', iter=0).replace('0000', '????')
-        self._iterRegex = re.compile('ite_(\d{4})')
+        self._iterRegex = re.compile(r'ite_(\d{4})')
 
     # -------------------------- DEFINE param functions -----------------------
     def _defineParams(self, form):

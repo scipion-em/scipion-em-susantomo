@@ -32,7 +32,7 @@ import pyworkflow.utils as pwutils
 from .constants import *
 
 
-__version__ = '3.0b3'
+__version__ = '3.0b4'
 _references = ['Sanchez2019', 'Sanchez2019b']
 _logo = "susan_logo.png"
 
@@ -40,7 +40,7 @@ _logo = "susan_logo.png"
 class Plugin(pwem.Plugin):
     _homeVar = SUSAN_HOME
     _pathVars = [SUSAN_HOME]
-    _url = "https://github.com/rkms86/SUSAN"
+    _url = "https://github.com/scipion-em/scipion-em-susantomo"
     _supportedVersions = [V0_1]
 
     @classmethod
@@ -107,12 +107,12 @@ class Plugin(pwem.Plugin):
                 f'cd .. && rmdir susan-{ver} && ',
                 f'git clone https://github.com/rkms86/SUSAN {ENV_NAME} && ',
                 f'cd {ENV_NAME}/extern && ',
-                f'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
-                f'cd eigen && mkdir build && cd build && '
-                f'cmake ../ -DCMAKE_INSTALL_PREFIX=../../eigen_lib && make install && ',
-                f'cd ../../../ && mkdir bin && cd bin && cmake .. && ',
+                'git clone https://gitlab.com/libeigen/eigen.git eigen && ',
+                'cd eigen && mkdir build && cd build && '
+                'cmake ../ -DCMAKE_INSTALL_PREFIX=../../eigen_lib && make install && ',
+                'cd ../../../ && mkdir bin && cd bin && cmake .. && ',
                 f'make -j {env.getProcessors()} && make prepare_python && ',
-                f'cd .. && pip install -e .'
+                'cd .. && pip install -e .'
             ]
 
             susanCmds = [(" ".join(installCmds), 'bin/susan_aligner_mpi')]

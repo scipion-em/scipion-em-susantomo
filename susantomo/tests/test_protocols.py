@@ -29,8 +29,8 @@ from pyworkflow.tests import BaseTest, DataSet, setupTestProject
 from pyworkflow.utils import magentaStr
 from pwem import Domain
 
-from tomo.protocols import ProtImportTs, ProtImportCoordinates3D
-from imod.protocols import ProtImodImportSetOfCtfTomoSeries, ProtImodTomoReconstruction
+from tomo.protocols import ProtImportTs, ProtImportCoordinates3D, ProtImportTsCTF
+from imod.protocols import ProtImodTomoReconstruction
 from ..protocols import ProtSusanEstimateCtf, ProtSusanMRA, ProtSusanAverage
 
 
@@ -45,9 +45,9 @@ class TestBase(BaseTest):
 
     @classmethod
     def runImportCtf(cls, **kwargs):
-        cls.protImportCtf = cls.newProtocol(ProtImodImportSetOfCtfTomoSeries, **kwargs)
+        cls.protImportCtf = cls.newProtocol(ProtImportTsCTF, **kwargs)
         cls.launchProtocol(cls.protImportCtf)
-        cls.assertIsNotNone(cls.protImportCtf.CTFTomoSeries,
+        cls.assertIsNotNone(cls.protImportCtf.CTFs,
                             "SetOfCTFTomoSeries has not been produced.")
         return cls.protImportCtf
 
@@ -81,7 +81,7 @@ class TestSusanCtf(TestBase):
         protCTF.inputTiltSeries.set(self.protImportTS.outputTiltSeries)
         self.launchProtocol(protCTF)
 
-        self.assertIsNotNone(protCTF.outputSetOfCTFTomoSeries,
+        self.assertIsNotNone(protCTF.CTFs,
                              "SetOfCTFTomoSeries has not been produced.")
 
 
@@ -94,7 +94,7 @@ class TestSusanMRAWorkflow(TestBase):
 
         print(magentaStr("\n==> Importing data - tilt series:"))
         cls.protImportTS = cls.runImportTiltSeries(filesPath=cls.path,
-                                                   filesPattern="mixedCTEM_{TS}.mrcs",
+                                                   filesPattern="{TS}.mrcs",
                                                    anglesFrom=2,  # tlt file
                                                    voltage=300,
                                                    sphericalAberration=2.7,
@@ -106,6 +106,7 @@ class TestSusanMRAWorkflow(TestBase):
 
         print(magentaStr("\n==> Importing data - tomo CTFs:"))
         cls.protImportCtf = cls.runImportCtf(filesPath=cls.path,
+                                             importFrom=1,  # IMOD
                                              filesPattern="mixedCTEM_tomo*.defocus",
                                              inputSetOfTiltSeries=cls.protImportTS.outputTiltSeries)
 
@@ -123,7 +124,7 @@ class TestSusanMRAWorkflow(TestBase):
         print(magentaStr("\n==> Importing data - coordinates 3D:"))
         protImportCoords = cls.runImportCoords(filesPath=cls.path,
                                                filesPattern="mixed*.tbl",
-                                               importFrom=3,  # dynamo
+                                               importFrom=4,  # dynamo
                                                samplingRate=20.96,
                                                boxSize=32,
                                                importTomograms=protRecon.Tomograms)
@@ -139,7 +140,7 @@ class TestSusanMRAWorkflow(TestBase):
         print(magentaStr("\n==> Testing susan - average and reconstruct:"))
         protAvg = ProtSusanAverage(tomoSize=110, boxSize=32)
         protAvg.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
-        protAvg.inputTiltSeries.set(self.protImportCtf.CTFTomoSeries)
+        protAvg.inputTiltSeries.set(self.protImportCtf.CTFs)
         self.launchProtocol(protAvg)
         self.assertIsNotNone(protAvg.outputAverage,
                              "AverageSubTomogram has not been produced.")
@@ -149,7 +150,7 @@ class TestSusanMRAWorkflow(TestBase):
                                coneRange=0, coneSampling=1, inplaneRange=0,
                                inplaneSampling=1, refine=0, refineFactor=1)
         protMRA.inputSetOfSubTomograms.set(self.protExtract.subtomograms)
-        protMRA.inputTiltSeries.set(self.protImportCtf.CTFTomoSeries)
+        protMRA.inputTiltSeries.set(self.protImportCtf.CTFs)
         protMRA.inputRefs.set([protAvg.outputAverage])
         protMRA.inputMasks.set([protAvg.outputAverage])
         self.launchProtocol(protMRA)
