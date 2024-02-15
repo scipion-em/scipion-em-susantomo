@@ -94,7 +94,7 @@ class TestSusanMRAWorkflow(TestBase):
 
         print(magentaStr("\n==> Importing data - tilt series:"))
         cls.protImportTS = cls.runImportTiltSeries(filesPath=cls.path,
-                                                   filesPattern="mixedCTEM_{TS}.mrcs",
+                                                   filesPattern="{TS}.mrcs",
                                                    anglesFrom=2,  # tlt file
                                                    voltage=300,
                                                    sphericalAberration=2.7,
