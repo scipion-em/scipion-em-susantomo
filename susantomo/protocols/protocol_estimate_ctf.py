@@ -43,7 +43,7 @@ from ..convert import parseImodCtf, readCtfModelStack
 
 
 class outputs(Enum):
-    outputCTFs = SetOfCTFTomoSeries
+    CTFs = SetOfCTFTomoSeries
 
 
 class ProtSusanEstimateCtf(ProtTsEstimateCTF):
