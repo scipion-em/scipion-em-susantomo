@@ -124,7 +124,7 @@ class TestSusanMRAWorkflow(TestBase):
         print(magentaStr("\n==> Importing data - coordinates 3D:"))
         protImportCoords = cls.runImportCoords(filesPath=cls.path,
                                                filesPattern="mixed*.tbl",
-                                               importFrom=3,  # dynamo
+                                               importFrom=4,  # dynamo
                                                samplingRate=20.96,
                                                boxSize=32,
                                                importTomograms=protRecon.Tomograms)
