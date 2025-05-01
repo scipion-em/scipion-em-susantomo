@@ -179,10 +179,10 @@ class ProtSusanBase(EMProtocol):
         self._initialize()
         pwutils.makePath(self._getExtraPath("input"))
         if self.isContinue():
-            self._insertFunctionStep(self.continueStep)
-        self._insertFunctionStep(self.convertInputStep)
-        self._insertFunctionStep(self.runSusanStep)
-        self._insertFunctionStep(self.createOutputStep)
+            self._insertFunctionStep(self.continueStep, needsGPU=False)
+        self._insertFunctionStep(self.convertInputStep, needsGPU=False)
+        self._insertFunctionStep(self.runSusanStep, needsGPU=True)
+        self._insertFunctionStep(self.createOutputStep, needsGPU=False)
 
     # --------------------------- STEPS functions -----------------------------
     def continueStep(self):

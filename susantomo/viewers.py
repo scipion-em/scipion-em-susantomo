@@ -241,8 +241,8 @@ class MRAViewer(EmProtocolViewer):
                 for ref3d in self._refsList:
                     fsc = self._plotFSC(frc, it, pix=pixSize, ref3d=ref3d)
                     fscSet.append(fsc)
+
         fscViewer.visualize(fscSet)
-        return [fscViewer]
 
     def _plotFSC(self, frc, iter, pix=1.0, ref3d=1):
         print(f"Loading FSC for iteration {iter}, reference {ref3d}")
